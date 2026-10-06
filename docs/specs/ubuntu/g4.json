@@ -1,0 +1,720 @@
+[
+  {
+    "id": "TWGCB-01-014-0079",
+    "category": "系統服務",
+    "title": "avahi-daemon 服務",
+    "expected": "停用",
+    "doc_method": "#systemctl --now mask avahi-daemon.service；#systemctl --now mask avahi-daemon.socket",
+    "type": "service_disabled",
+    "params": {
+      "units": [
+        "avahi-daemon.service",
+        "avahi-daemon.socket"
+      ]
+    },
+    "check": "對每個 unit 執行 systemctl is-enabled 與 is-active：unit 不存在（未安裝）→ 不適用/合格；is-enabled 為 masked（依文件作法）且 is-active 非 active → 合格；其餘（enabled/disabled 但仍可被啟動、或 active）→ 不合格。",
+    "fix": "記錄每個 unit 原本的 is-enabled 與 is-active 狀態作為備份；執行 systemctl --now mask avahi-daemon.socket avahi-daemon.service。回滾：systemctl unmask 該 unit，依原狀態 systemctl enable 及/或 start。",
+    "risk": "A",
+    "risk_reason": "伺服器通常不需要 zeroconf 服務探索，停用不影響一般連線。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 avahi-daemon",
+    "notes": "已實作。PDF 抽出文字開頭混入前一條規則（usermod -g）殘文，非本規則內容。"
+  },
+  {
+    "id": "TWGCB-01-014-0080",
+    "category": "系統服務",
+    "title": "Samba 服務",
+    "expected": "停用",
+    "doc_method": "#systemctl --now mask smbd",
+    "type": "service_disabled",
+    "params": {
+      "units": [
+        "smbd.service"
+      ]
+    },
+    "check": "對每個 unit 執行 systemctl is-enabled 與 is-active：unit 不存在（未安裝）→ 不適用/合格；is-enabled 為 masked（依文件作法）且 is-active 非 active → 合格；其餘（enabled/disabled 但仍可被啟動、或 active）→ 不合格。",
+    "fix": "記錄每個 unit 原本的 is-enabled 與 is-active 狀態作為備份；執行 systemctl --now mask smbd.service。回滾：systemctl unmask 該 unit，依原狀態 systemctl enable 及/或 start。",
+    "risk": "B",
+    "risk_reason": "伺服器若裝有 Samba 多半正在提供檔案分享，停用會中斷 Windows 用戶端存取。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 samba（存在 smbd.service）",
+    "notes": "Ubuntu 22.04 Samba 另有 nmbd.service 與 samba-ad-dc.service，文件只要求 smbd；可考慮一併檢查 nmbd 但僅列為資訊。Ubuntu Server 預設未安裝 samba。"
+  },
+  {
+    "id": "TWGCB-01-014-0081",
+    "category": "系統服務",
+    "title": "Squid 服務",
+    "expected": "停用",
+    "doc_method": "#systemctl --now mask squid",
+    "type": "service_disabled",
+    "params": {
+      "units": [
+        "squid.service"
+      ]
+    },
+    "check": "對每個 unit 執行 systemctl is-enabled 與 is-active：unit 不存在（未安裝）→ 不適用/合格；is-enabled 為 masked（依文件作法）且 is-active 非 active → 合格；其餘（enabled/disabled 但仍可被啟動、或 active）→ 不合格。",
+    "fix": "記錄每個 unit 原本的 is-enabled 與 is-active 狀態作為備份；執行 systemctl --now mask squid.service。回滾：systemctl unmask 該 unit，依原狀態 systemctl enable 及/或 start。",
+    "risk": "B",
+    "risk_reason": "若主機作為代理伺服器使用，停用會中斷依賴代理的用戶端連線。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 squid（存在 squid.service）",
+    "notes": "PDF 中本規則的 ID 與說明被拆在 0080 區塊後半與 0081 區塊，已重組。Ubuntu Server 預設未安裝 squid。"
+  },
+  {
+    "id": "TWGCB-01-014-0082",
+    "category": "系統服務",
+    "title": "SNMP 服務",
+    "expected": "停用",
+    "doc_method": "#systemctl --now mask snmpd",
+    "type": "service_disabled",
+    "params": {
+      "units": [
+        "snmpd.service"
+      ]
+    },
+    "check": "對每個 unit 執行 systemctl is-enabled 與 is-active：unit 不存在（未安裝）→ 不適用/合格；is-enabled 為 masked（依文件作法）且 is-active 非 active → 合格；其餘（enabled/disabled 但仍可被啟動、或 active）→ 不合格。",
+    "fix": "記錄每個 unit 原本的 is-enabled 與 is-active 狀態作為備份；執行 systemctl --now mask snmpd.service。回滾：systemctl unmask 該 unit，依原狀態 systemctl enable 及/或 start。",
+    "risk": "B",
+    "risk_reason": "若網管/監控系統透過 SNMP 收集此主機資訊，停用會使監控中斷。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 snmpd（存在 snmpd.service）",
+    "notes": "Ubuntu 套件名稱為 snmpd（snmp 套件僅為用戶端工具，不在本規則範圍）。預設未安裝。"
+  },
+  {
+    "id": "TWGCB-01-014-0083",
+    "category": "系統服務",
+    "title": "FTP 伺服器",
+    "expected": "停用",
+    "doc_method": "#systemctl --now mask vsftpd",
+    "type": "service_disabled",
+    "params": {
+      "units": [
+        "vsftpd.service"
+      ]
+    },
+    "check": "對每個 unit 執行 systemctl is-enabled 與 is-active：unit 不存在（未安裝）→ 不適用/合格；is-enabled 為 masked（依文件作法）且 is-active 非 active → 合格；其餘（enabled/disabled 但仍可被啟動、或 active）→ 不合格。",
+    "fix": "記錄每個 unit 原本的 is-enabled 與 is-active 狀態作為備份；執行 systemctl --now mask vsftpd.service。回滾：systemctl unmask 該 unit，依原狀態 systemctl enable 及/或 start。",
+    "risk": "B",
+    "risk_reason": "若主機正以 FTP 提供檔案傳輸，停用會中斷用戶端；應先改用 SFTP。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 vsftpd（存在 vsftpd.service）",
+    "notes": "文件僅涵蓋 vsftpd；Ubuntu 上其他 FTP 伺服器（proftpd-basic 的 proftpd.service、pure-ftpd.service）文件未提及，可列為資訊提示但不自動處理。"
+  },
+  {
+    "id": "TWGCB-01-014-0084",
+    "category": "系統服務",
+    "title": "rsync 服務",
+    "expected": "停用",
+    "doc_method": "#systemctl --now mask rsync",
+    "type": "service_disabled",
+    "params": {
+      "units": [
+        "rsync.service"
+      ]
+    },
+    "check": "對每個 unit 執行 systemctl is-enabled 與 is-active：unit 不存在（未安裝）→ 不適用/合格；is-enabled 為 masked（依文件作法）且 is-active 非 active → 合格；其餘（enabled/disabled 但仍可被啟動、或 active）→ 不合格。",
+    "fix": "記錄每個 unit 原本的 is-enabled 與 is-active 狀態作為備份；執行 systemctl --now mask rsync.service。回滾：systemctl unmask 該 unit，依原狀態 systemctl enable 及/或 start。",
+    "risk": "A",
+    "risk_reason": "只停用 rsync daemon，rsync 用戶端與透過 SSH 的 rsync 不受影響。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 rsync（存在 rsync.service）",
+    "notes": "文件說明寫「停用 rsyncd 服務」但指令為 mask rsync；Ubuntu 22.04 的 unit 名稱為 rsync.service（無 rsyncd.service）。Ubuntu 預設安裝 rsync 套件，rsync.service 預設為 disabled 且有 ConditionPathExists=/etc/rsyncd.conf，因此多數主機只需 mask 即可合格。若 /etc/rsyncd.conf 存在且服務 active，代表有人刻意使用 daemon 模式，修復前應提示。"
+  },
+  {
+    "id": "TWGCB-01-014-0085",
+    "category": "安裝與維護軟體",
+    "title": "NIS 用戶端套件",
+    "expected": "移除",
+    "doc_method": "#apt purge nis",
+    "type": "package_absent",
+    "params": {
+      "pkg": "nis"
+    },
+    "check": "執行 dpkg-query -W -f='${Status}' nis：未回傳或狀態不是「install ok installed」（含 deinstall/config-files 殘留）→ 合格；否則不合格。",
+    "fix": "備份：記錄套件版本（dpkg-query -W -f='${Version}' nis），並將該套件的 conffiles（dpkg-query -W -f='${Conffiles}' nis 列出的檔案）複製到備份目錄。修復：DEBIAN_FRONTEND=noninteractive apt-get purge -y nis。回滾：apt-get install -y nis=<原版本>（需可存取套件來源或本機快取），再還原備份的設定檔。",
+    "risk": "A",
+    "risk_reason": "NIS 已過時，一般伺服器不使用；但若帳號鑑別仰賴 NIS 會影響登入，修復前應檢查 /etc/nsswitch.conf 是否含 nis。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 nis",
+    "notes": "Ubuntu 22.04 套件名為 nis（universe），預設未安裝。建議修復前檢查 /etc/nsswitch.conf 是否使用 nis，若有則改為 B 級並提示人工確認。"
+  },
+  {
+    "id": "TWGCB-01-014-0086",
+    "category": "安裝與維護軟體",
+    "title": "rsh 用戶端套件",
+    "expected": "移除",
+    "doc_method": "#apt purge rsh-client",
+    "type": "package_absent",
+    "params": {
+      "pkg": "rsh-client"
+    },
+    "check": "執行 dpkg-query -W -f='${Status}' rsh-client：未回傳或狀態不是「install ok installed」（含 deinstall/config-files 殘留）→ 合格；否則不合格。",
+    "fix": "備份：記錄套件版本（dpkg-query -W -f='${Version}' rsh-client），並將該套件的 conffiles（dpkg-query -W -f='${Conffiles}' rsh-client 列出的檔案）複製到備份目錄。修復：DEBIAN_FRONTEND=noninteractive apt-get purge -y rsh-client。回滾：apt-get install -y rsh-client=<原版本>（需可存取套件來源或本機快取），再還原備份的設定檔。",
+    "risk": "A",
+    "risk_reason": "rsh 用戶端為不加密的舊工具，移除不影響 SSH 等正常連線。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 rsh-client",
+    "notes": "Ubuntu 22.04 預設未安裝。注意 rsh-redone-client 等替代套件也可提供 rsh 指令，文件未涵蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0087",
+    "category": "安裝與維護軟體",
+    "title": "talk 用戶端套件",
+    "expected": "移除",
+    "doc_method": "#apt purge talk",
+    "type": "package_absent",
+    "params": {
+      "pkg": "talk"
+    },
+    "check": "執行 dpkg-query -W -f='${Status}' talk：未回傳或狀態不是「install ok installed」（含 deinstall/config-files 殘留）→ 合格；否則不合格。",
+    "fix": "備份：記錄套件版本（dpkg-query -W -f='${Version}' talk），並將該套件的 conffiles（dpkg-query -W -f='${Conffiles}' talk 列出的檔案）複製到備份目錄。修復：DEBIAN_FRONTEND=noninteractive apt-get purge -y talk。回滾：apt-get install -y talk=<原版本>（需可存取套件來源或本機快取），再還原備份的設定檔。",
+    "risk": "A",
+    "risk_reason": "talk 為不加密的舊式聊天工具，伺服器幾乎不使用。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 talk",
+    "notes": "Ubuntu 22.04 預設未安裝；ytalk 等替代套件文件未涵蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0088",
+    "category": "安裝與維護軟體",
+    "title": "telnet 用戶端套件",
+    "expected": "移除",
+    "doc_method": "#apt purge telnet",
+    "type": "package_absent",
+    "params": {
+      "pkg": "telnet"
+    },
+    "check": "執行 dpkg-query -W -f='${Status}' telnet：未回傳或狀態不是「install ok installed」（含 deinstall/config-files 殘留）→ 合格；否則不合格。",
+    "fix": "備份：記錄套件版本（dpkg-query -W -f='${Version}' telnet），並將該套件的 conffiles（dpkg-query -W -f='${Conffiles}' telnet 列出的檔案）複製到備份目錄。修復：DEBIAN_FRONTEND=noninteractive apt-get purge -y telnet。回滾：apt-get install -y telnet=<原版本>（需可存取套件來源或本機快取），再還原備份的設定檔。",
+    "risk": "A",
+    "risk_reason": "telnet 用戶端不加密，移除不影響 SSH。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 telnet",
+    "notes": "已實作。"
+  },
+  {
+    "id": "TWGCB-01-014-0089",
+    "category": "網路設定",
+    "title": "IP 轉送",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.ip_forward=0、net.ipv6.conf.all.forwarding=0；執行 #sysctl -w net.ipv4.ip_forward=0；#sysctl -w net.ipv6.conf.all.forwarding=0；使變動生效：#sysctl -w net.ipv4.route.flush=1；#sysctl -w net.ipv6.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.ip_forward",
+          "value": "0"
+        },
+        {
+          "key": "net.ipv6.conf.all.forwarding",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.ip_forward=0、net.ipv6.conf.all.forwarding=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.ip_forward = 0、net.ipv6.conf.all.forwarding = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1；IPv6 啟用時再執行 sysctl -w net.ipv6.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "B",
+    "risk_reason": "Docker、LXD、Kubernetes 或作為路由/VPN 閘道的主機需要 IP 轉送，停用會中斷容器與轉送網路。",
+    "needs_reboot": false,
+    "applies_when": "一律（IPv4 部分）；IPv6 部分僅於系統啟用 IPv6（存在 /proc/sys/net/ipv6）時適用",
+    "notes": "已實作（偵測到容器/虛擬化環境時需 --include-risky）。"
+  },
+  {
+    "id": "TWGCB-01-014-0090",
+    "category": "網路設定",
+    "title": "所有網路介面禁止傳送 ICMP 重新導向封包",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.all.send_redirects=0；執行 #sysctl -w net.ipv4.conf.all.send_redirects=0；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.all.send_redirects",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.all.send_redirects=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.all.send_redirects = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "非路由器主機不需要送出 ICMP 重新導向，停用不影響一般連線。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "已實作。文件建議 all 與 default 都要設定（另見 0091）。"
+  },
+  {
+    "id": "TWGCB-01-014-0091",
+    "category": "網路設定",
+    "title": "預設網路介面禁止傳送 ICMP 重新導向封包",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.default.send_redirects=0；執行 #sysctl -w net.ipv4.conf.default.send_redirects=0；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.default.send_redirects",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.default.send_redirects=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.default.send_redirects = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "非路由器主機不需要送出 ICMP 重新導向，停用不影響一般連線。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "已實作。PDF 原文 key 與值之間被斷行為「send_redirects =0」，正確為 net.ipv4.conf.default.send_redirects=0。"
+  },
+  {
+    "id": "TWGCB-01-014-0092",
+    "category": "網路設定",
+    "title": "所有網路介面阻擋來源路由封包",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.all.accept_source_route=0、net.ipv6.conf.all.accept_source_route=0；執行 #sysctl -w net.ipv4.conf.all.accept_source_route=0；#sysctl -w net.ipv6.conf.all.accept_source_route=0；使變動生效：#sysctl -w net.ipv4.route.flush=1；#sysctl -w net.ipv6.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.all.accept_source_route",
+          "value": "0"
+        },
+        {
+          "key": "net.ipv6.conf.all.accept_source_route",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.all.accept_source_route=0、net.ipv6.conf.all.accept_source_route=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.all.accept_source_route = 0、net.ipv6.conf.all.accept_source_route = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1；IPv6 啟用時再執行 sysctl -w net.ipv6.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "正常網路流量不使用來源路由，阻擋不影響連線。",
+    "needs_reboot": false,
+    "applies_when": "一律（IPv4 部分）；IPv6 部分僅於系統啟用 IPv6（存在 /proc/sys/net/ipv6）時適用",
+    "notes": "PDF 將 key 斷行為「accept_source_rou te」，已還原。Ubuntu 22.04 核心預設值即為 0，多數主機僅需補持久設定。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0093",
+    "category": "網路設定",
+    "title": "預設網路介面阻擋來源路由封包",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.default.accept_source_route=0、net.ipv6.conf.default.accept_source_route=0；執行 #sysctl -w net.ipv4.conf.default.accept_source_route=0；#sysctl -w net.ipv6.conf.default.accept_source_route=0；使變動生效：#sysctl -w net.ipv4.route.flush=1；#sysctl -w net.ipv6.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.default.accept_source_route",
+          "value": "0"
+        },
+        {
+          "key": "net.ipv6.conf.default.accept_source_route",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.default.accept_source_route=0、net.ipv6.conf.default.accept_source_route=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.default.accept_source_route = 0、net.ipv6.conf.default.accept_source_route = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1；IPv6 啟用時再執行 sysctl -w net.ipv6.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "正常網路流量不使用來源路由，阻擋不影響連線。",
+    "needs_reboot": false,
+    "applies_when": "一律（IPv4 部分）；IPv6 部分僅於系統啟用 IPv6（存在 /proc/sys/net/ipv6）時適用",
+    "notes": "PDF 將 key 斷行為「accept_source _route」，已還原。Ubuntu 22.04 核心預設值即為 0，多數主機僅需補持久設定。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0094",
+    "category": "網路設定",
+    "title": "所有網路介面阻擋 ICMP 重新導向封包",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.all.accept_redirects=0、net.ipv6.conf.all.accept_redirects=0；執行 #sysctl -w net.ipv4.conf.all.accept_redirects=0；#sysctl -w net.ipv6.conf.all.accept_redirects=0；使變動生效：#sysctl -w net.ipv4.route.flush=1；#sysctl -w net.ipv6.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.all.accept_redirects",
+          "value": "0"
+        },
+        {
+          "key": "net.ipv6.conf.all.accept_redirects",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.all.accept_redirects=0、net.ipv6.conf.all.accept_redirects=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.all.accept_redirects = 0、net.ipv6.conf.all.accept_redirects = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1；IPv6 啟用時再執行 sysctl -w net.ipv6.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "主機路由由設定或 DHCP 決定，阻擋 ICMP 重新導向不影響一般連線。",
+    "needs_reboot": false,
+    "applies_when": "一律（IPv4 部分）；IPv6 部分僅於系統啟用 IPv6（存在 /proc/sys/net/ipv6）時適用",
+    "notes": "Ubuntu 22.04 核心預設為 1，多數主機會不合格。若啟用 ufw，/etc/ufw/sysctl.conf 也可能設定同名參數（以 net/ipv4/... 斜線格式），ufw 啟動時會套用，檢測時應一併檢查。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0095",
+    "category": "網路設定",
+    "title": "預設網路介面阻擋 ICMP 重新導向封包",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.default.accept_redirects=0、net.ipv6.conf.default.accept_redirects=0；執行 #sysctl -w net.ipv4.conf.default.accept_redirects=0；#sysctl -w net.ipv6.conf.default.accept_redirects=0；使變動生效：#sysctl -w net.ipv4.route.flush=1；#sysctl -w net.ipv6.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.default.accept_redirects",
+          "value": "0"
+        },
+        {
+          "key": "net.ipv6.conf.default.accept_redirects",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.default.accept_redirects=0、net.ipv6.conf.default.accept_redirects=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.default.accept_redirects = 0、net.ipv6.conf.default.accept_redirects = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1；IPv6 啟用時再執行 sysctl -w net.ipv6.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "主機路由由設定或 DHCP 決定，阻擋 ICMP 重新導向不影響一般連線。",
+    "needs_reboot": false,
+    "applies_when": "一律（IPv4 部分）；IPv6 部分僅於系統啟用 IPv6（存在 /proc/sys/net/ipv6）時適用",
+    "notes": "PDF 將 key 斷行為「accept_redirec ts」，已還原。Ubuntu 22.04 核心預設為 1。若啟用 ufw，/etc/ufw/sysctl.conf 可能有同名設定。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0096",
+    "category": "網路設定",
+    "title": "所有網路介面阻擋安全之 ICMP 重新導向封包",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.all.secure_redirects=0；執行 #sysctl -w net.ipv4.conf.all.secure_redirects=0；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.all.secure_redirects",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.all.secure_redirects=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.all.secure_redirects = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "非路由器主機不需接受重新導向，阻擋不影響一般連線。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 核心預設為 1。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0097",
+    "category": "網路設定",
+    "title": "預設網路介面阻擋安全之 ICMP 重新導向封包",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.default.secure_redirects=0；執行 #sysctl -w net.ipv4.conf.default.secure_redirects=0；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.default.secure_redirects",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.default.secure_redirects=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.default.secure_redirects = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "非路由器主機不需接受重新導向，阻擋不影響一般連線。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "PDF 將 key 斷行為「secure_redirec ts」，已還原。Ubuntu 22.04 核心預設為 1。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0098",
+    "category": "網路設定",
+    "title": "所有網路介面記錄可疑封包",
+    "expected": "1",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.all.log_martians=1；執行 #sysctl -w net.ipv4.conf.all.log_martians=1；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.all.log_martians",
+          "value": "1"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.all.log_martians=1。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.all.log_martians = 1；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "只增加核心日誌記錄，不影響連線（可能增加日誌量）。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 核心預設為 0。ufw 的 /etc/ufw/sysctl.conf 可能含 net/ipv4/conf/all/log_martians=0，ufw 啟用時會在開機後覆寫，需一併檢查並註解。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0099",
+    "category": "網路設定",
+    "title": "預設網路介面記錄可疑封包",
+    "expected": "1",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.default.log_martians=1；執行 #sysctl -w net.ipv4.conf.default.log_martians=1；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.default.log_martians",
+          "value": "1"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.default.log_martians=1。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.default.log_martians = 1；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "只增加核心日誌記錄，不影響連線（可能增加日誌量）。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "PDF 將值斷行為「log_martians= 1」，正確為 net.ipv4.conf.default.log_martians=1。Ubuntu 22.04 核心預設為 0；ufw 的 /etc/ufw/sysctl.conf 可能設為 0，需一併檢查。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0100",
+    "category": "網路設定",
+    "title": "不回應 ICMP 廣播要求",
+    "expected": "1",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.icmp_echo_ignore_broadcasts=1；執行 #sysctl -w net.ipv4.icmp_echo_ignore_broadcasts=1；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.icmp_echo_ignore_broadcasts",
+          "value": "1"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.icmp_echo_ignore_broadcasts=1。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.icmp_echo_ignore_broadcasts = 1；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "只忽略廣播 ping，不影響單播 ping 與一般連線。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "PDF 將 key 斷行為「icmp_echo_ignore_broadc asts」，已還原。Ubuntu 22.04 核心預設即為 1。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0101",
+    "category": "網路設定",
+    "title": "忽略偽造之 ICMP 錯誤訊息",
+    "expected": "1",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.icmp_ignore_bogus_error_responses=1；執行 #sysctl -w net.ipv4.icmp_ignore_bogus_error_responses=1；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.icmp_ignore_bogus_error_responses",
+          "value": "1"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.icmp_ignore_bogus_error_responses=1。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.icmp_ignore_bogus_error_responses = 1；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "只忽略不合規的 ICMP 錯誤回應，不影響連線。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "PDF 將 key 斷行為「icmp_ignore_bogus_error_ responses」，已還原。Ubuntu 22.04 核心預設即為 1。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0102",
+    "category": "網路設定",
+    "title": "所有網路介面啟用逆向路徑過濾功能",
+    "expected": "1",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.all.rp_filter=1；執行 #sysctl -w net.ipv4.conf.all.rp_filter=1；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.all.rp_filter",
+          "value": "1"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.all.rp_filter=1。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.all.rp_filter = 1；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "B",
+    "risk_reason": "設為 1（嚴格模式）在多網卡、非對稱路由、策略路由或部分 VPN/容器環境會丟棄合法封包，造成連線中斷。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設由 /usr/lib/sysctl.d/50-default.conf（systemd）或 /etc/sysctl.d/10-network-security.conf 設為 2（寬鬆模式），值 2 不符合 GCB 的 1。修改前應提示多網卡主機確認路由對稱性。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0103",
+    "category": "網路設定",
+    "title": "預設網路介面啟用逆向路徑過濾功能",
+    "expected": "1",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.conf.default.rp_filter=1；執行 #sysctl -w net.ipv4.conf.default.rp_filter=1；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.conf.default.rp_filter",
+          "value": "1"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.conf.default.rp_filter=1。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.conf.default.rp_filter = 1；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "B",
+    "risk_reason": "設為 1（嚴格模式）在多網卡、非對稱路由或部分 VPN/容器環境會丟棄合法封包。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設為 2（寬鬆模式），不符合 GCB 的 1，需覆寫並註解 10-network-security.conf 等檔案中的衝突值。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0104",
+    "category": "網路設定",
+    "title": "TCP SYN cookies",
+    "expected": "1",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv4.tcp_syncookies=1；執行 #sysctl -w net.ipv4.tcp_syncookies=1；使變動生效：#sysctl -w net.ipv4.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv4.tcp_syncookies",
+          "value": "1"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv4.tcp_syncookies=1。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv4.tcp_syncookies = 1；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv4.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "A",
+    "risk_reason": "SYN cookies 僅在 SYN 佇列滿時啟動，不影響一般連線。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設即為 1（/etc/sysctl.d/10-network-security.conf 亦設定）。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0105",
+    "category": "網路設定",
+    "title": "所有網路介面阻擋 IPv6 路由器公告訊息",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv6.conf.all.accept_ra=0；執行 #sysctl -w net.ipv6.conf.all.accept_ra=0；使變動生效：#sysctl -w net.ipv6.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv6.conf.all.accept_ra",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv6.conf.all.accept_ra=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv6.conf.all.accept_ra = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv6.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "B",
+    "risk_reason": "若主機以 SLAAC/RA 取得 IPv6 位址或預設閘道，阻擋 RA 會使 IPv6 連線中斷。",
+    "needs_reboot": false,
+    "applies_when": "系統啟用 IPv6（存在 /proc/sys/net/ipv6）",
+    "notes": "文件只要求 net.ipv6.route.flush=1。Ubuntu 22.04 使用 netplan + systemd-networkd 時，networkd 會自行在使用者空間處理 RA（IPv6AcceptRA），並將介面層 accept_ra 設為 0，因此 sysctl 檢測合格不代表 RA 已被阻擋；若需完全阻擋，應在 netplan 設定 accept-ra: false（屬 B 級人工處理）。修復前應確認 IPv6 是否以靜態方式設定。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0106",
+    "category": "網路設定",
+    "title": "預設網路介面阻擋 IPv6 路由器公告訊息",
+    "expected": "0",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改：net.ipv6.conf.default.accept_ra=0；執行 #sysctl -w net.ipv6.conf.default.accept_ra=0；使變動生效：#sysctl -w net.ipv6.route.flush=1",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        {
+          "key": "net.ipv6.conf.default.accept_ra",
+          "value": "0"
+        }
+      ]
+    },
+    "check": "對每個 key：讀 /proc/sys 對應路徑（或 sysctl -n）取得目前值；並依 systemd-sysctl 順序解析 /etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/lib/sysctl.d 下的 *.conf 及 /etc/sysctl.conf，取最後生效的持久值。目前值與持久值皆等於期望值 → 合格。若 key 不存在（如 IPv6 停用時的 net.ipv6.*）→ 該 key 視為不適用。期望值：net.ipv6.conf.default.accept_ra=0。",
+    "fix": "備份所有將被修改的 sysctl 設定檔與 /etc/sysctl.d/60-gcb-checker.conf，並記錄各 key 原本的執行期值。修復：註解其他設定檔中與期望值衝突的同名設定，於 /etc/sysctl.d/60-gcb-checker.conf 寫入 net.ipv6.conf.default.accept_ra = 0；再以 sysctl -w 設定執行期值，最後執行 sysctl -w net.ipv6.route.flush=1。回滾：還原備份檔案並以 sysctl -w 寫回原執行期值。",
+    "risk": "B",
+    "risk_reason": "若主機以 SLAAC/RA 取得 IPv6 位址或預設閘道，阻擋 RA 會使新介面無法自動取得 IPv6 設定。",
+    "needs_reboot": false,
+    "applies_when": "系統啟用 IPv6（存在 /proc/sys/net/ipv6）",
+    "notes": "PDF 中本規則的名稱與設定行被拆在 0105 區塊末尾，已重組。文件只要求 net.ipv6.route.flush=1。systemd-networkd 會自行處理 RA，與 0105 相同限制。route.flush 為唯寫觸發參數，只能用 sysctl -w 執行，不可寫入持久設定檔、也不應被檢測讀取。60-gcb-checker.conf 排序在 /etc/sysctl.d/99-sysctl.conf（指向 /etc/sysctl.conf 的連結）之前，故必須先註解其他檔案中的衝突設定，否則開機後會被覆蓋。"
+  },
+  {
+    "id": "TWGCB-01-014-0107",
+    "category": "網路設定",
+    "title": "DCCP 協定",
+    "expected": "停用",
+    "doc_method": "#vim /etc/modprobe.d/dccp.conf，加入：install dccp /bin/false 與 blacklist dccp；移除模組：#modprobe -r dccp",
+    "type": "module_disabled",
+    "params": {
+      "module": "dccp"
+    },
+    "check": "合格條件同時成立：(1) 執行 modprobe -n -v dccp 輸出為 install /bin/false（或解析 /etc/modprobe.d/*.conf 有 install dccp /bin/false 或 /bin/true）；(2) /etc/modprobe.d/*.conf 有 blacklist dccp；(3) /proc/modules（lsmod）中沒有 dccp。若核心沒有此模組（modinfo dccp 失敗）仍以設定檔判定。",
+    "fix": "備份 /etc/modprobe.d/dccp.conf（若已存在）；寫入 install dccp /bin/false 與 blacklist dccp；若模組已載入則 modprobe -r dccp。回滾：還原或刪除該檔案（模組不自動重新載入）。若 modprobe -r 因使用中失敗，記錄為需重開機。",
+    "risk": "A",
+    "risk_reason": "一般伺服器不使用 DCCP，停用不影響 TCP/UDP 服務。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 的 dccp 模組位於 linux-modules-extra，預設不載入。"
+  },
+  {
+    "id": "TWGCB-01-014-0108",
+    "category": "網路設定",
+    "title": "SCTP 協定",
+    "expected": "停用",
+    "doc_method": "#vim /etc/modprobe.d/sctp.conf，加入：install sctp /bin/false 與 blacklist sctp；移除模組：#modprobe -r sctp",
+    "type": "module_disabled",
+    "params": {
+      "module": "sctp"
+    },
+    "check": "合格條件同時成立：(1) 執行 modprobe -n -v sctp 輸出為 install /bin/false（或解析 /etc/modprobe.d/*.conf 有 install sctp /bin/false 或 /bin/true）；(2) /etc/modprobe.d/*.conf 有 blacklist sctp；(3) /proc/modules（lsmod）中沒有 sctp。若核心沒有此模組（modinfo sctp 失敗）仍以設定檔判定。",
+    "fix": "備份 /etc/modprobe.d/sctp.conf（若已存在）；寫入 install sctp /bin/false 與 blacklist sctp；若模組已載入則 modprobe -r sctp。回滾：還原或刪除該檔案（模組不自動重新載入）。若 modprobe -r 因使用中失敗，記錄為需重開機。",
+    "risk": "A",
+    "risk_reason": "一般伺服器不使用 SCTP；但電信相關應用（如 Diameter、SIGTRAN）需要，若模組使用中應提示人工確認。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 sctp 模組預設不載入；若 lsmod 顯示 sctp 被使用中，modprobe -r 會失敗，需人工確認用途。"
+  },
+  {
+    "id": "TWGCB-01-014-0109",
+    "category": "網路設定",
+    "title": "RDS 協定",
+    "expected": "停用",
+    "doc_method": "#vim /etc/modprobe.d/rds.conf，加入：install rds /bin/false 與 blacklist rds；移除模組：#modprobe -r rds",
+    "type": "module_disabled",
+    "params": {
+      "module": "rds"
+    },
+    "check": "合格條件同時成立：(1) 執行 modprobe -n -v rds 輸出為 install /bin/false（或解析 /etc/modprobe.d/*.conf 有 install rds /bin/false 或 /bin/true）；(2) /etc/modprobe.d/*.conf 有 blacklist rds；(3) /proc/modules（lsmod）中沒有 rds。若核心沒有此模組（modinfo rds 失敗）仍以設定檔判定。",
+    "fix": "備份 /etc/modprobe.d/rds.conf（若已存在）；寫入 install rds /bin/false 與 blacklist rds；若模組已載入則 modprobe -r rds。回滾：還原或刪除該檔案（模組不自動重新載入）。若 modprobe -r 因使用中失敗，記錄為需重開機。",
+    "risk": "A",
+    "risk_reason": "RDS 主要用於 Oracle 叢集，一般伺服器不使用。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 rds 模組位於 linux-modules-extra，預設不載入。若主機為 Oracle RAC 節點則不應停用。"
+  },
+  {
+    "id": "TWGCB-01-014-0110",
+    "category": "網路設定",
+    "title": "TIPC 協定",
+    "expected": "停用",
+    "doc_method": "#vim /etc/modprobe.d/tipc.conf，加入：install tipc /bin/false 與 blacklist tipc；移除模組：#modprobe -r tipc",
+    "type": "module_disabled",
+    "params": {
+      "module": "tipc"
+    },
+    "check": "合格條件同時成立：(1) 執行 modprobe -n -v tipc 輸出為 install /bin/false（或解析 /etc/modprobe.d/*.conf 有 install tipc /bin/false 或 /bin/true）；(2) /etc/modprobe.d/*.conf 有 blacklist tipc；(3) /proc/modules（lsmod）中沒有 tipc。若核心沒有此模組（modinfo tipc 失敗）仍以設定檔判定。",
+    "fix": "備份 /etc/modprobe.d/tipc.conf（若已存在）；寫入 install tipc /bin/false 與 blacklist tipc；若模組已載入則 modprobe -r tipc。回滾：還原或刪除該檔案（模組不自動重新載入）。若 modprobe -r 因使用中失敗，記錄為需重開機。",
+    "risk": "A",
+    "risk_reason": "TIPC 用於特定叢集通訊，一般伺服器不使用。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 tipc 模組位於 linux-modules-extra，預設不載入。"
+  },
+  {
+    "id": "TWGCB-01-014-0111",
+    "category": "網路設定",
+    "title": "無線網路介面",
+    "expected": "停用",
+    "doc_method": "若已安裝 nmcli：#nmcli radio all off。若未安裝 nmcli：執行腳本，以 find /sys/class/net/*/ -type d -name wireless 找出無線介面，取得其 device/driver/module 的模組名稱（basename \"$(readlink -f \"$driverdir\"/device/driver/module)\"），對每個模組 $dm 寫入 /etc/modprobe.d/disable_wireless.conf：install $dm /bin/false 與 blacklist $dm",
+    "type": "custom",
+    "params": {
+      "description": "偵測無線介面並停用：有 nmcli 則 nmcli radio all off，否則將無線網卡驅動模組寫入 /etc/modprobe.d/disable_wireless.conf 封鎖",
+      "modprobe_file": "/etc/modprobe.d/disable_wireless.conf"
+    },
+    "check": "以 glob /sys/class/net/*/wireless（或 /sys/class/net/*/phy80211）找出無線介面；沒有 → 合格（不適用）。有則：若 nmcli 存在且 NetworkManager 執行中，nmcli radio wifi 與 nmcli radio wwan 皆為 disabled → 合格；否則取每個無線介面的驅動模組名稱（os.path.realpath(/sys/class/net/<if>/device/driver/module) 的 basename），所有模組在 /etc/modprobe.d/*.conf 皆有 install <mod> /bin/false 與 blacklist <mod> → 合格。也可輔以 rfkill（/sys/class/rfkill/*/soft）判斷。",
+    "fix": "備份：記錄 nmcli radio 狀態或備份 /etc/modprobe.d/disable_wireless.conf（若存在）。有 nmcli：nmcli radio all off，回滾為 nmcli radio wifi on / wwan on。無 nmcli：以去重方式寫入 /etc/modprobe.d/disable_wireless.conf（每個模組 install <mod> /bin/false、blacklist <mod>），回滾還原或刪除該檔；模組已載入者需重開機或 modprobe -r 才生效。",
+    "risk": "B",
+    "risk_reason": "若主機透過無線網路連線，停用會立即中斷遠端管理連線。",
+    "needs_reboot": true,
+    "applies_when": "系統存在無線網路介面",
+    "notes": "Ubuntu 22.04 Server 預設使用 netplan + systemd-networkd，通常未安裝 nmcli，且多數伺服器沒有無線網卡（直接不適用）。文件腳本有誤：find 輸出以換行分隔卻用 xargs -0，多個無線介面時 dirname 會處理錯誤；且以 >> 附加，重複執行會產生重複行，實作應用 Python 去重。腳本只寫設定檔不卸載模組，需重開機（或 modprobe -r）才生效。nmcli radio all off 為 NetworkManager 狀態，模組封鎖則跨重開機持久。修復前應確認目前預設路由不是走無線介面。"
+  }
+]

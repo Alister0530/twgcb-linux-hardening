@@ -1,0 +1,924 @@
+[
+  {
+    "id": "TWGCB-01-014-0194",
+    "category": "Chrony 配置",
+    "title": "chrony 校時套件",
+    "expected": "安裝",
+    "doc_method": "#apt install chrony；#systemctl --now mask systemd-timesyncd.service；#apt purge ntp",
+    "type": "custom",
+    "params": {
+      "desc": "package_present(chrony) + service_disabled/masked(systemd-timesyncd.service) + package_absent(ntp)",
+      "pkg_present": "chrony",
+      "mask_units": [
+        "systemd-timesyncd.service"
+      ],
+      "pkg_absent": [
+        "ntp"
+      ]
+    },
+    "check": "dpkg-query -W -f='${Status}' chrony 為 'install ok installed'；`systemctl is-enabled systemd-timesyncd.service` 為 masked 或 not-found（套件已移除）；dpkg-query 顯示 ntp 未安裝（或僅 config-files 狀態視為已移除）。三者皆符合才合格。",
+    "fix": "1) 記錄 chrony/ntp/systemd-timesyncd 套件狀態與 systemd-timesyncd 的 enabled 狀態；備份 /etc/ntp.conf、/etc/default/ntp（若存在）。2) DEBIAN_FRONTEND=noninteractive apt-get install -y chrony（Ubuntu 22.04 安裝 chrony 會自動移除 systemd-timesyncd 套件）。3) systemctl --now mask systemd-timesyncd.service（unit 不存在時略過）。4) apt-get purge -y ntp。回滾：apt-get purge chrony、重新安裝原有套件（ntp/systemd-timesyncd）、還原設定檔、systemctl unmask 並依原狀態 enable。",
+    "risk": "B",
+    "risk_reason": "更換或移除校時套件會改變系統時間同步來源，且需連線套件庫。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Chrony 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": "此項同時包含「安裝 chrony」「mask timesyncd」「移除 ntp」三個動作，GCB 設定值僅寫「安裝」。Ubuntu 22.04 的 chrony 與 systemd-timesyncd 套件互斥，安裝 chrony 時 timesyncd 套件會被移除，mask 可能回報 unit 不存在，應視為合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0195",
+    "category": "Chrony 配置",
+    "title": "chrony 校時設定",
+    "expected": "設定 1 個以上校時來源",
+    "doc_method": "編輯 /etc/chrony.conf，新增或修改：server (NTP 校時伺服器名稱) 或 pool (NTP 池名稱)；#systemctl restart chrony",
+    "type": "custom",
+    "params": {
+      "desc": "在 chrony 設定中至少有一行 server 或 pool",
+      "files": [
+        "/etc/chrony/chrony.conf",
+        "/etc/chrony/conf.d/*.conf",
+        "/etc/chrony/sources.d/*.sources"
+      ],
+      "pattern": "^\\s*(server|pool)\\s+\\S+"
+    },
+    "check": "讀取 /etc/chrony/chrony.conf，以及其 confdir/sourcedir/include 指向的 /etc/chrony/conf.d/*.conf 與 /etc/chrony/sources.d/*.sources，忽略 # 或 ! 開頭註解，至少一行符合 `^(server|pool)\\s+\\S+` 即合格。可輔以 `chronyc -n sources` 有至少一個來源。",
+    "fix": "Ubuntu 預設 chrony.conf 已有 `pool ntp.ubuntu.com ...` 等設定，通常已合格。若不合格，需由使用者提供環境專屬的校時伺服器位址，寫入獨立檔 /etc/chrony/conf.d/99-gcb.conf（內容 `server <位址> iburst`），再 systemctl restart chrony。回滾：刪除該檔並重新啟動 chrony。",
+    "risk": "C",
+    "risk_reason": "校時伺服器位址屬環境專屬資訊，無法自動決定。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Chrony 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": "文件路徑 /etc/chrony.conf 為 RHEL 路徑，Ubuntu 22.04 實際為 /etc/chrony/chrony.conf（0196 即使用此路徑）。Ubuntu 預設設定已含 pool，且支援 conf.d / sources.d 目錄。"
+  },
+  {
+    "id": "TWGCB-01-014-0196",
+    "category": "Chrony 配置",
+    "title": "chrony 校時使用者設定",
+    "expected": "_chrony",
+    "doc_method": "編輯 /etc/chrony/chrony.conf，新增或修改：user _chrony；#systemctl restart chrony",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/chrony/chrony.conf",
+      "key": "user",
+      "value": "_chrony",
+      "compare": "eq",
+      "sep": " ",
+      "also_read": [
+        "/etc/chrony/conf.d/*.conf"
+      ]
+    },
+    "check": "解析 /etc/chrony/chrony.conf 與 /etc/chrony/conf.d/*.conf 中的 `user` 指令；若有設定須等於 _chrony；未設定時 Ubuntu 編譯預設即為 _chrony，可再以 `ps -o user= -C chronyd` 確認執行身分為 _chrony（輔助判斷）。嚴格模式下要求明確寫出 `user _chrony`。",
+    "fix": "若有其他 user 設定，備份原檔後將其改為 `user _chrony`；若未設定，新增獨立檔 /etc/chrony/conf.d/99-gcb-user.conf 內容 `user _chrony`，然後 systemctl restart chrony。回滾：還原備份或刪除該 drop-in 並重新啟動。",
+    "risk": "A",
+    "risk_reason": "與預設行為一致，只是明確寫出服務帳戶，不影響連線。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Chrony 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": "Ubuntu 的 chrony 預設即以 _chrony 執行（編譯時指定），預設設定檔不一定有 user 行。conf.d 中的 user 指令需確認 chrony.conf 有 `confdir /etc/chrony/conf.d`（Ubuntu 22.04 預設有）。"
+  },
+  {
+    "id": "TWGCB-01-014-0197",
+    "category": "Chrony 配置",
+    "title": "chrony 校時服務",
+    "expected": "啟用",
+    "doc_method": "#systemctl --now enable chrony",
+    "type": "service_enabled",
+    "params": {
+      "unit": "chrony.service",
+      "pkg": "chrony"
+    },
+    "check": "`systemctl is-enabled chrony.service` 為 enabled 且 `systemctl is-active chrony.service` 為 active。",
+    "fix": "記錄原 enabled/active 狀態後執行 systemctl --now enable chrony。回滾：依記錄 disable/stop。",
+    "risk": "A",
+    "risk_reason": "啟用校時服務只同步時間，對連線影響極小。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Chrony 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": "Ubuntu 的 unit 名稱為 chrony.service（chronyd.service 為別名）。"
+  },
+  {
+    "id": "TWGCB-01-014-0198",
+    "category": "systemd-timesyncd 配置",
+    "title": "systemd-timesyncd 校時套件",
+    "expected": "安裝",
+    "doc_method": "移除其他校時套件：#apt purge chrony；#apt purge ntp",
+    "type": "custom",
+    "params": {
+      "desc": "package_present(systemd-timesyncd) + package_absent(chrony, ntp)",
+      "pkg_present": "systemd-timesyncd",
+      "pkg_absent": [
+        "chrony",
+        "ntp"
+      ]
+    },
+    "check": "dpkg-query 顯示 systemd-timesyncd 已安裝，且 chrony、ntp 皆未安裝（config-files 狀態視為已移除）；並確認 systemd-timesyncd.service 未被 mask。",
+    "fix": "1) 備份 /etc/chrony/、/etc/ntp.conf（若存在）並記錄套件狀態。2) apt-get purge -y chrony ntp。3) 若 systemd-timesyncd 未安裝則 apt-get install -y systemd-timesyncd；若被 mask 則 systemctl unmask systemd-timesyncd.service。回滾：重新安裝被移除的套件並還原設定檔、恢復 mask 狀態。",
+    "risk": "B",
+    "risk_reason": "移除或更換校時套件會改變時間同步來源，且需連線套件庫。",
+    "needs_reboot": false,
+    "applies_when": "判定為 systemd-timesyncd 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": "文件說明「systemd-timesyncd 隨作業系統一併安裝」，但在 Ubuntu 22.04 它是獨立套件 systemd-timesyncd，安裝 chrony 或 ntp 時會被移除，因此檢測須確認套件存在。PDF 此列的 TWGCB-ID 被分頁拆開，設定方法只有移除指令。"
+  },
+  {
+    "id": "TWGCB-01-014-0199",
+    "category": "systemd-timesyncd 配置",
+    "title": "systemd-timesyncd 校時設定",
+    "expected": "設定 1 個以上校時來源",
+    "doc_method": "編輯 /etc/systemd/timesyncd.conf：[Time] NTP=(NTP 校時伺服器名稱)；#systemctl restart systemd-timesyncd",
+    "type": "custom",
+    "params": {
+      "desc": "[Time] 區段的 NTP= 至少一個值",
+      "files": [
+        "/etc/systemd/timesyncd.conf",
+        "/etc/systemd/timesyncd.conf.d/*.conf",
+        "/run/systemd/timesyncd.conf.d/*.conf",
+        "/usr/lib/systemd/timesyncd.conf.d/*.conf"
+      ],
+      "section": "Time",
+      "key": "NTP"
+    },
+    "check": "依 systemd 設定合併規則讀取 /etc/systemd/timesyncd.conf 與 timesyncd.conf.d/*.conf（後者覆蓋前者），[Time] 區段最終 NTP= 值非空即合格。可輔以 `timedatectl show-timesync -p SystemNTPServers --value` 非空確認。僅有 FallbackNTP 不算合格。",
+    "fix": "需由使用者提供校時伺服器位址，寫入 drop-in /etc/systemd/timesyncd.conf.d/99-gcb.conf：`[Time]\\nNTP=<位址>`，再 systemctl restart systemd-timesyncd。回滾：刪除該 drop-in 並重新啟動服務。",
+    "risk": "C",
+    "risk_reason": "校時伺服器位址屬環境專屬資訊，無法自動決定。",
+    "needs_reboot": false,
+    "applies_when": "判定為 systemd-timesyncd 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": "Ubuntu 22.04 預設 timesyncd.conf 的 NTP= 是註解狀態，僅靠編譯預設的 FallbackNTP=ntp.ubuntu.com 校時，因此預設會判為不合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0200",
+    "category": "systemd-timesyncd 配置",
+    "title": "systemd-timesyncd 校時服務",
+    "expected": "啟用",
+    "doc_method": "#systemctl --now enable systemd-timesyncd",
+    "type": "service_enabled",
+    "params": {
+      "unit": "systemd-timesyncd.service",
+      "pkg": "systemd-timesyncd"
+    },
+    "check": "`systemctl is-enabled systemd-timesyncd.service` 為 enabled 且 is-active 為 active（可輔以 `timedatectl show -p NTP --value` 為 yes）。",
+    "fix": "記錄原狀態；若被 mask 先 unmask，再 systemctl --now enable systemd-timesyncd。回滾：依記錄恢復 disable/mask。",
+    "risk": "A",
+    "risk_reason": "啟用預設校時服務，對連線影響極小。",
+    "needs_reboot": false,
+    "applies_when": "判定為 systemd-timesyncd 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0201",
+    "category": "NTP 配置",
+    "title": "ntp 校時套件",
+    "expected": "安裝",
+    "doc_method": "#apt install ntp；#systemctl --now mask systemd-timesyncd.service；#apt purge chrony",
+    "type": "custom",
+    "params": {
+      "desc": "package_present(ntp) + mask(systemd-timesyncd.service) + package_absent(chrony)",
+      "pkg_present": "ntp",
+      "mask_units": [
+        "systemd-timesyncd.service"
+      ],
+      "pkg_absent": [
+        "chrony"
+      ]
+    },
+    "check": "dpkg-query 顯示 ntp 已安裝；systemd-timesyncd.service 為 masked 或 not-found；chrony 未安裝。三者皆符合才合格。",
+    "fix": "1) 記錄套件與服務狀態，備份 /etc/chrony/（若存在）。2) DEBIAN_FRONTEND=noninteractive apt-get install -y ntp。3) systemctl --now mask systemd-timesyncd.service（unit 不存在則略過）。4) apt-get purge -y chrony。回滾：purge ntp、重新安裝原套件、還原設定、unmask timesyncd。",
+    "risk": "B",
+    "risk_reason": "更換校時套件會改變時間同步來源，且需連線套件庫。",
+    "needs_reboot": false,
+    "applies_when": "判定為 NTP 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": "Ubuntu 22.04 仍提供 ntp 套件（4.2.8），安裝時可能連帶移除 systemd-timesyncd 套件，mask 時回報 unit 不存在應視為合格。PDF 此列的 TWGCB-ID 被分頁拆開。"
+  },
+  {
+    "id": "TWGCB-01-014-0202",
+    "category": "NTP 配置",
+    "title": "ntp 校時設定",
+    "expected": "設定 1 個以上校時來源",
+    "doc_method": "編輯 /etc/ntp.conf，新增或修改：server (NTP 校時伺服器名稱) 或 pool (NTP 池名稱)；#systemctl restart ntp",
+    "type": "custom",
+    "params": {
+      "desc": "/etc/ntp.conf 至少一行 server 或 pool",
+      "files": [
+        "/etc/ntp.conf"
+      ],
+      "pattern": "^\\s*(server|pool)\\s+\\S+"
+    },
+    "check": "讀取 /etc/ntp.conf，忽略註解，至少一行符合 `^(server|pool)\\s+\\S+` 即合格（可輔以 `ntpq -pn` 有來源）。",
+    "fix": "Ubuntu 預設 /etc/ntp.conf 已有 pool 0.ubuntu.pool.ntp.org 等設定，通常已合格。若不合格，需由使用者提供位址，備份 /etc/ntp.conf 後於檔尾加入 `server <位址> iburst`（以標記註解包住方便移除），再 systemctl restart ntp。回滾：還原備份並重新啟動。",
+    "risk": "C",
+    "risk_reason": "校時伺服器位址屬環境專屬資訊，無法自動決定。",
+    "needs_reboot": false,
+    "applies_when": "判定為 NTP 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": "ntp 不支援 drop-in 目錄，只能直接修改 /etc/ntp.conf。"
+  },
+  {
+    "id": "TWGCB-01-014-0203",
+    "category": "NTP 配置",
+    "title": "ntp 校時使用者設定",
+    "expected": "ntp",
+    "doc_method": "編輯 /etc/init.d/ntp，新增或修改：RUNASUSER=ntp；#systemctl restart ntp",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/init.d/ntp",
+      "key": "RUNASUSER",
+      "value": "ntp",
+      "compare": "eq",
+      "sep": "=",
+      "also_check": [
+        "/usr/lib/ntp/ntp-systemd-wrapper"
+      ]
+    },
+    "check": "讀取 /etc/init.d/ntp 與 /usr/lib/ntp/ntp-systemd-wrapper（Ubuntu 22.04 的 ntp.service 實際透過此 wrapper 啟動），未註解的 RUNASUSER= 值皆須為 ntp；並以 `ps -o user= -C ntpd` 確認執行身分為 ntp（輔助）。",
+    "fix": "備份上述檔案，將 RUNASUSER= 改為 RUNASUSER=ntp（不存在則新增），systemctl restart ntp。回滾：還原備份並重新啟動。",
+    "risk": "A",
+    "risk_reason": "與套件預設值一致，只改服務執行身分。",
+    "needs_reboot": false,
+    "applies_when": "判定為 NTP 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": "Ubuntu 22.04 在 systemd 下 ntp.service 執行的是 /usr/lib/ntp/ntp-systemd-wrapper，只改 /etc/init.d/ntp 實際不生效，兩處都需檢查。/usr/lib 下的檔案會被套件更新覆寫（預設值已是 ntp，影響不大）。PDF 此列的 TWGCB-ID 被分頁拆開。"
+  },
+  {
+    "id": "TWGCB-01-014-0204",
+    "category": "NTP 配置",
+    "title": "ntp 校時服務",
+    "expected": "啟用",
+    "doc_method": "#systemctl --now enable ntp",
+    "type": "service_enabled",
+    "params": {
+      "unit": "ntp.service",
+      "pkg": "ntp"
+    },
+    "check": "`systemctl is-enabled ntp.service` 為 enabled 且 is-active 為 active。",
+    "fix": "記錄原狀態後執行 systemctl --now enable ntp。回滾：依記錄 disable/stop。",
+    "risk": "A",
+    "risk_reason": "啟用校時服務，對連線影響極小。",
+    "needs_reboot": false,
+    "applies_when": "判定為 NTP 組時適用。校時方式判定（三組擇一）：①chrony 套件已安裝（dpkg-query -W -f='${Status}' chrony 為 'install ok installed'）且 chrony.service 為 enabled 或 active → Chrony 組；②否則 ntp 套件已安裝且 ntp.service 為 enabled 或 active → NTP 組；③否則 → systemd-timesyncd 組（Ubuntu 22.04 預設）。若同時有多組啟用，依 Chrony > NTP > timesyncd 擇一並回報衝突；三組皆未使用時（例如 timesyncd 被 mask 且未安裝 chrony/ntp）預設套用 systemd-timesyncd 組並判為不合格，不自動改裝其他校時套件；未被選中的兩組標記為不適用。",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0205",
+    "category": "UFW 配置",
+    "title": "ufw 防火牆套件",
+    "expected": "安裝",
+    "doc_method": "#apt install ufw",
+    "type": "package_present",
+    "params": {
+      "pkg": "ufw"
+    },
+    "check": "dpkg-query -W -f='${Status}' ufw 為 'install ok installed'。",
+    "fix": "DEBIAN_FRONTEND=noninteractive apt-get install -y ufw（安裝不會自動啟用防火牆）。回滾：apt-get purge -y ufw（僅限原本未安裝時）。",
+    "risk": "A",
+    "risk_reason": "僅安裝套件，不啟用規則，不影響連線。",
+    "needs_reboot": false,
+    "applies_when": "判定為 UFW 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "Ubuntu 22.04 Server 預設已安裝 ufw。"
+  },
+  {
+    "id": "TWGCB-01-014-0206",
+    "category": "UFW 配置",
+    "title": "iptables-persistent 套件",
+    "expected": "移除",
+    "doc_method": "#apt purge iptables-persistent",
+    "type": "package_absent",
+    "params": {
+      "pkg": "iptables-persistent"
+    },
+    "check": "dpkg-query 顯示 iptables-persistent 未安裝（或僅剩 config-files 狀態）。",
+    "fix": "備份 /etc/iptables/rules.v4、/etc/iptables/rules.v6 與目前 `iptables-save`/`ip6tables-save` 輸出，記錄套件狀態後 apt-get purge -y iptables-persistent。回滾：重新安裝 iptables-persistent 並還原規則檔。",
+    "risk": "B",
+    "risk_reason": "移除後開機不再載入原保存的 netfilter 規則，可能改變防火牆行為。",
+    "needs_reboot": false,
+    "applies_when": "判定為 UFW 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "netfilter-persistent 套件可能殘留，可一併檢查是否仍啟用。"
+  },
+  {
+    "id": "TWGCB-01-014-0207",
+    "category": "UFW 配置",
+    "title": "ufw 服務",
+    "expected": "啟用",
+    "doc_method": "#systemctl --now enable ufw",
+    "type": "custom",
+    "params": {
+      "desc": "service_enabled(ufw.service) + ufw 本身為 active",
+      "unit": "ufw.service",
+      "pkg": "ufw"
+    },
+    "check": "`systemctl is-enabled ufw.service` 為 enabled，且 `ufw status` 第一行為 `Status: active`（或 /etc/ufw/ufw.conf 中 ENABLED=yes）。兩者皆符合才合格。",
+    "fix": "1) 備份 /etc/ufw/（整個目錄）與 /etc/default/ufw。2) 先取得目前 sshd 使用的埠：`sshd -T 2>/dev/null | awk '/^port /{print $2}'`（可能多個），若失敗則用 `ss -tlnpH | grep sshd` 解析，皆失敗才退回 22；另應取得目前 SSH 連線來源（環境變數 SSH_CONNECTION）以確認不會被阻斷。 對每個 SSH 埠先執行 `ufw allow in <port>/tcp`（ufw 未啟用時也可先加規則）。3) systemctl enable ufw，再 `ufw --force enable`。4) 啟用後確認 `ufw status` 中 SSH 規則存在。回滾：`ufw --force disable`、還原 /etc/ufw/ 與 /etc/default/ufw、依原狀態 systemctl disable ufw。",
+    "risk": "B",
+    "risk_reason": "啟用防火牆會套用預設拒絕入站，未先放行 SSH 會切斷遠端連線。",
+    "needs_reboot": false,
+    "applies_when": "判定為 UFW 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "只執行 systemctl enable ufw 並不會啟動防火牆規則，ufw 是否生效取決於 `ufw enable`（ENABLED=yes），文件未提及。ufw 啟用時預設 incoming 即為 deny，一定要先放行 SSH。"
+  },
+  {
+    "id": "TWGCB-01-014-0208",
+    "category": "UFW 配置",
+    "title": "在 ufw 設定回送流量規則",
+    "expected": "建立回送流量規則",
+    "doc_method": "#ufw allow in on lo；#ufw allow out on lo；#ufw deny in from 127.0.0.0/8；#ufw deny in from ::1",
+    "type": "custom",
+    "params": {
+      "desc": "ufw 使用者規則包含 4 條回送規則",
+      "rules": [
+        "allow in on lo",
+        "allow out on lo",
+        "deny in from 127.0.0.0/8",
+        "deny in from ::1"
+      ]
+    },
+    "check": "解析 `ufw status verbose`（或 /etc/ufw/user.rules 與 /etc/ufw/user6.rules）須包含：`Anywhere on lo ALLOW IN Anywhere`、`Anywhere ALLOW OUT Anywhere on lo`、`Anywhere DENY IN 127.0.0.0/8`、`Anywhere (v6) DENY IN ::1`；且 allow in on lo 排序在 deny 規則之前。ufw 未啟用時改解析 user.rules / user6.rules 中對應的 ### tuple ### 行。",
+    "fix": "備份 /etc/ufw/user.rules、/etc/ufw/user6.rules，依序執行文件四條指令（已存在者 ufw 會自動略過）。回滾：還原兩個檔案並 `ufw reload`。",
+    "risk": "B",
+    "risk_reason": "新增入站拒絕規則屬防火牆變更，可能影響使用回送位址的服務。",
+    "needs_reboot": false,
+    "applies_when": "判定為 UFW 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "`ufw deny in from ::1` 需 /etc/default/ufw 中 IPV6=yes（Ubuntu 預設為 yes），否則該規則不會生效。ufw 的 before.rules 本身已允許 lo，但 GCB 仍要求明確建立使用者規則。"
+  },
+  {
+    "id": "TWGCB-01-014-0209",
+    "category": "UFW 配置",
+    "title": "在 ufw 建立預設拒絕規則",
+    "expected": "deny",
+    "doc_method": "#ufw default deny incoming；#ufw default deny outgoing；#ufw default deny routed",
+    "type": "custom",
+    "params": {
+      "desc": "ufw 輸入/輸出/路由預設政策皆為 deny",
+      "file": "/etc/default/ufw",
+      "keys": {
+        "DEFAULT_INPUT_POLICY": "DROP",
+        "DEFAULT_OUTPUT_POLICY": "DROP",
+        "DEFAULT_FORWARD_POLICY": "DROP"
+      }
+    },
+    "check": "`ufw status verbose` 的 Default 行為 `deny (incoming), deny (outgoing), deny (routed)`；或解析 /etc/default/ufw 中 DEFAULT_INPUT_POLICY、DEFAULT_OUTPUT_POLICY、DEFAULT_FORWARD_POLICY 皆為 \"DROP\"（reject 對應 REJECT，不算 deny）。",
+    "fix": "1) 備份 /etc/default/ufw 與 /etc/ufw/user.rules、user6.rules。2) 先取得目前 sshd 使用的埠：`sshd -T 2>/dev/null | awk '/^port /{print $2}'`（可能多個），若失敗則用 `ss -tlnpH | grep sshd` 解析，皆失敗才退回 22；另應取得目前 SSH 連線來源（環境變數 SSH_CONNECTION）以確認不會被阻斷。 先執行 `ufw allow in <ssh埠>/tcp`。3) 因 outgoing 也要 deny，須先依使用者確認的清單放行必要對外連線（建議至少 DNS 53/udp+tcp、NTP 123/udp、套件庫 80/443/tcp，例如 `ufw allow out 53`），已建立連線的回應封包由 ufw before.rules 的 conntrack 規則放行，SSH 連線本身不受影響。4) 執行 `ufw default deny incoming`、`ufw default deny outgoing`、`ufw default deny routed`。回滾：還原備份檔並 `ufw reload`。",
+    "risk": "B",
+    "risk_reason": "預設拒絕（尤其 outgoing）會阻斷未放行的連線，必須先放行 SSH 與必要對外埠。",
+    "needs_reboot": false,
+    "applies_when": "判定為 UFW 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "outgoing deny 會導致 DNS、apt、校時、監控等對外連線全斷，需放行哪些對外埠屬業務決定，實際部署時建議需使用者確認放行清單後才執行（近似 C）。routed 若主機作為容器/虛擬化主機（docker、lxd）會影響轉送。"
+  },
+  {
+    "id": "TWGCB-01-014-0210",
+    "category": "Nftables 配置",
+    "title": "nftables 防火牆套件",
+    "expected": "安裝",
+    "doc_method": "#apt install nftables",
+    "type": "package_present",
+    "params": {
+      "pkg": "nftables"
+    },
+    "check": "dpkg-query -W -f='${Status}' nftables 為 'install ok installed'。",
+    "fix": "DEBIAN_FRONTEND=noninteractive apt-get install -y nftables（不會自動啟用服務）。回滾：原本未安裝時 apt-get purge -y nftables。",
+    "risk": "A",
+    "risk_reason": "僅安裝套件，不啟用規則。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Nftables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "Ubuntu 22.04 預設已安裝 nftables，但 nftables.service 預設停用。"
+  },
+  {
+    "id": "TWGCB-01-014-0211",
+    "category": "Nftables 配置",
+    "title": "ufw 套件",
+    "expected": "移除",
+    "doc_method": "#apt purge ufw",
+    "type": "package_absent",
+    "params": {
+      "pkg": "ufw"
+    },
+    "check": "dpkg-query 顯示 ufw 未安裝（或僅 config-files 狀態）。",
+    "fix": "備份 /etc/ufw/、/etc/default/ufw 及目前 `nft list ruleset` 輸出；若 ufw 為 active，須先確認 nftables 規則已放行 SSH 再處理。執行 `ufw --force disable`（若啟用中）後 apt-get purge -y ufw。回滾：apt-get install ufw、還原 /etc/ufw/ 與 /etc/default/ufw，依原狀態 `ufw --force enable`。",
+    "risk": "B",
+    "risk_reason": "移除正在使用的防火牆會改變主機的封包過濾行為。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Nftables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "Ubuntu 22.04 Server 預設安裝 ufw，移除前應確認未在使用中，否則防火牆判定應歸為 UFW 組。"
+  },
+  {
+    "id": "TWGCB-01-014-0212",
+    "category": "Nftables 配置",
+    "title": "nftables 服務",
+    "expected": "啟用",
+    "doc_method": "#systemctl --now enable nftables",
+    "type": "service_enabled",
+    "params": {
+      "unit": "nftables.service",
+      "pkg": "nftables"
+    },
+    "check": "`systemctl is-enabled nftables.service` 為 enabled 且 is-active 為 active。",
+    "fix": "1) 備份 /etc/nftables.conf 與目前 `nft list ruleset` 輸出（存為可 `nft -f` 還原的檔案）。2) 啟動前檢查 /etc/nftables.conf：Ubuntu 預設內容為 `flush ruleset` 加上 policy accept 的 inet filter 表，啟動會清空現有規則（包含 docker 等自動產生的規則）；若檔案中含 policy drop，須確認已放行 SSH（先取得目前 sshd 使用的埠：`sshd -T 2>/dev/null | awk '/^port /{print $2}'`（可能多個），若失敗則用 `ss -tlnpH | grep sshd` 解析，皆失敗才退回 22；另應取得目前 SSH 連線來源（環境變數 SSH_CONNECTION）以確認不會被阻斷。）。3) `nft -c -f /etc/nftables.conf` 語法檢查通過後 systemctl --now enable nftables。回滾：systemctl --now disable nftables，以備份的 ruleset `nft -f` 還原，還原 /etc/nftables.conf。",
+    "risk": "B",
+    "risk_reason": "啟動服務會 flush 並重新載入規則集，可能影響現有連線與其他服務的規則。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Nftables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "PDF 中本項的說明文字被分頁拆開（0211/0212 交錯），重組後設定方法為 systemctl --now enable nftables。"
+  },
+  {
+    "id": "TWGCB-01-014-0213",
+    "category": "Nftables 配置",
+    "title": "在 nftables 中建立表",
+    "expected": "1 個以上",
+    "doc_method": "#nft create table inet (表名稱)；範例：#nft create table inet filter",
+    "type": "custom",
+    "params": {
+      "desc": "nft list tables 至少 1 個表，且保存於 /etc/nftables.conf",
+      "cmd": "nft list tables"
+    },
+    "check": "`nft list tables` 至少輸出 1 行 `table <family> <name>`（應排除 ufw/iptables-nft 自動建立的 ip filter 等表，若判定為 Nftables 組時以 /etc/nftables.conf 定義的表為準）；並確認 /etc/nftables.conf（含其 include 檔）中有 `table` 定義，確保重開機後仍存在。",
+    "fix": "備份 /etc/nftables.conf 與目前 ruleset。若 /etc/nftables.conf 無 table 定義，加入 `table inet filter { }`；執行 `nft create table inet filter`（已存在則略過）。回滾：還原 /etc/nftables.conf，並以備份 ruleset 還原（`nft flush ruleset; nft -f <備份>`）。",
+    "risk": "A",
+    "risk_reason": "建立空表不含任何規則，不影響封包過濾。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Nftables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件指令只建立執行期的表，未寫入設定檔，重開機即消失，需配合 0217 保存。Ubuntu 預設 /etc/nftables.conf 已定義 table inet filter，啟用服務後通常即合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0214",
+    "category": "Nftables 配置",
+    "title": "在 nftables 建立基本鏈",
+    "expected": "1 個以上",
+    "doc_method": "#nft create chain inet (表名稱) (鏈名稱) { type filter hook (input|forward|output) priority 0 \\; }；範例：#nft create chain inet filter input { type filter hook input priority 0 \\; }、forward、output 三條",
+    "type": "custom",
+    "params": {
+      "desc": "nft ruleset 中至少 1 個 type filter hook 基本鏈",
+      "cmd": "nft list ruleset",
+      "hooks": [
+        "input",
+        "forward",
+        "output"
+      ]
+    },
+    "check": "解析 `nft list ruleset`，至少有 1 條鏈含 `type filter hook (input|forward|output)` 即符合 GCB 值；另檢查 input、forward、output 三個 hook 是否齊全（0216 需要三者），缺少者列為警告。同時確認 /etc/nftables.conf 中有對應定義。",
+    "fix": "備份 /etc/nftables.conf 與 ruleset。在 /etc/nftables.conf 的 table inet filter 中補上缺少的 `chain input { type filter hook input priority 0; policy accept; }`（forward、output 同理，先以 accept 建立，預設拒絕由 0216 處理），再以 `nft -c -f` 檢查並 `nft -f /etc/nftables.conf` 載入。回滾：還原設定檔與備份 ruleset。",
+    "risk": "A",
+    "risk_reason": "以 policy accept 建立空的基本鏈不會阻擋流量。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Nftables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "GCB 值為「1 個以上」，但說明要求建立 input、forward、output 三條基本鏈。注意：建立 hook 鏈時若未指定 policy，預設為 accept。"
+  },
+  {
+    "id": "TWGCB-01-014-0215",
+    "category": "Nftables 配置",
+    "title": "在 nftables 設定回送流量規則",
+    "expected": "建立回送流量規則",
+    "doc_method": "#nft add rule inet filter input iif lo accept；#nft add rule inet filter input ip saddr 127.0.0.0/8 counter drop；#nft add rule inet filter input ip6 saddr ::1 counter drop",
+    "type": "custom",
+    "params": {
+      "desc": "inet filter input 鏈包含三條回送規則",
+      "cmd": "nft list chain inet filter input",
+      "rules": [
+        "iif \"lo\" accept",
+        "ip saddr 127.0.0.0/8 counter .* drop",
+        "ip6 saddr ::1 counter .* drop"
+      ]
+    },
+    "check": "解析 `nft list ruleset` 中 hook input 的基本鏈，須包含 `iif \"lo\" accept`、`ip saddr 127.0.0.0/8 ... drop`、`ip6 saddr ::1 ... drop`（counter 後會有 packets/bytes 計數，比對時忽略），且 iif lo accept 排在兩條 drop 之前；並確認 /etc/nftables.conf 有相同規則。",
+    "fix": "備份 /etc/nftables.conf 與 ruleset。在設定檔的 input 鏈開頭加入三條規則：`iif \"lo\" accept`、`ip saddr 127.0.0.0/8 counter drop`、`ip6 saddr ::1 counter drop`，`nft -c -f` 檢查後 `nft -f /etc/nftables.conf` 載入。回滾：還原設定檔與 ruleset。",
+    "risk": "B",
+    "risk_reason": "新增入站 drop 規則屬防火牆變更，可能影響依賴回送位址的服務。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Nftables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件指令僅修改執行期規則，未保存。文件範例假設表為 inet filter，實作應找出實際的 input 基本鏈。"
+  },
+  {
+    "id": "TWGCB-01-014-0216",
+    "category": "Nftables 配置",
+    "title": "在 nftables 建立預設拒絕規則",
+    "expected": "Drop",
+    "doc_method": "#nft chain (位址族) (表名稱) (鏈名稱) { policy drop \\; }；範例：#nft chain inet filter input { policy drop \\; }、#nft chain inet filter forward { policy drop \\; }、#nft chain inet filter output { policy drop \\; }",
+    "type": "custom",
+    "params": {
+      "desc": "input/forward/output 基本鏈 policy 皆為 drop",
+      "cmd": "nft list ruleset",
+      "hooks": [
+        "input",
+        "forward",
+        "output"
+      ],
+      "policy": "drop"
+    },
+    "check": "解析 `nft list ruleset`，hook input、forward、output 的基本鏈皆存在且 `policy drop;`；並確認 /etc/nftables.conf 中三條鏈的 policy 皆為 drop。",
+    "fix": "1) 備份 /etc/nftables.conf 與 ruleset。2) 先取得目前 sshd 使用的埠：`sshd -T 2>/dev/null | awk '/^port /{print $2}'`（可能多個），若失敗則用 `ss -tlnpH | grep sshd` 解析，皆失敗才退回 22；另應取得目前 SSH 連線來源（環境變數 SSH_CONNECTION）以確認不會被阻斷。 3) 在 input 鏈加入 `ct state established,related accept` 與 `tcp dport { <ssh埠> } accept`，在 output 鏈加入 `ct state established,related accept`（否則 SSH 回應封包會被 output drop 擋掉），並依使用者確認清單放行必要對外連線（DNS、NTP、套件庫）。4) 將三條鏈改為 policy drop，`nft -c -f` 檢查後載入。5) 建議採用延時自動回滾：先排程（例如 systemd-run --on-active=120 執行 `nft -f <備份>`），確認 SSH 仍可連線後再取消。回滾：`nft flush ruleset; nft -f <備份>` 並還原設定檔。",
+    "risk": "B",
+    "risk_reason": "預設丟棄會阻斷所有未放行流量，未先放行 SSH 與已建立連線會立即切斷遠端連線。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Nftables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件範例只設定 policy，若直接執行會切斷 SSH 及所有對外連線；需放行哪些對外埠屬業務決定。"
+  },
+  {
+    "id": "TWGCB-01-014-0217",
+    "category": "Nftables 配置",
+    "title": "載入 nftables 規則",
+    "expected": "開機時自動載入 nftables 規則集",
+    "doc_method": "編輯 /etc/sysconfig/nftables.conf，將含 include 參數的行取消註解，例如：include \"/etc/nftables/main.nft\"",
+    "type": "custom",
+    "params": {
+      "desc": "nftables.service enabled 且 /etc/nftables.conf 定義完整規則集",
+      "unit": "nftables.service",
+      "file": "/etc/nftables.conf"
+    },
+    "check": "`systemctl is-enabled nftables.service` 為 enabled；`systemctl cat nftables.service` 的 ExecStart 讀取 /etc/nftables.conf；該檔（含所有未註解的 include 目標且檔案存在）定義了至少一個表與 input/forward/output 基本鏈；`nft -c -f /etc/nftables.conf` 語法檢查通過。",
+    "fix": "備份 /etc/nftables.conf。將目前執行期規則保存：`nft list ruleset` 輸出（排除 ufw/docker 自動產生的表）寫入 /etc/nftables.conf（保留開頭 `#!/usr/sbin/nft -f` 與 `flush ruleset`），或寫入獨立檔 /etc/nftables.d/gcb.nft 並在 /etc/nftables.conf 加入 `include \"/etc/nftables.d/gcb.nft\"`；`nft -c -f` 檢查後 systemctl enable nftables。回滾：還原 /etc/nftables.conf、刪除 include 檔。",
+    "risk": "B",
+    "risk_reason": "開機時載入的規則集若有誤（含 policy drop）可能導致重開機後無法遠端連線。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Nftables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件路徑 /etc/sysconfig/nftables.conf 與 /etc/nftables/main.nft 是 RHEL 系統的路徑，Ubuntu 22.04 不存在；Ubuntu 的 nftables.service 是執行 `nft -f /etc/nftables.conf`，應以此檔為準。"
+  },
+  {
+    "id": "TWGCB-01-014-0218",
+    "category": "Iptables 配置",
+    "title": "iptables 防火牆套件",
+    "expected": "安裝",
+    "doc_method": "#apt install iptables iptables-persistent",
+    "type": "custom",
+    "params": {
+      "desc": "package_present(iptables) + package_present(iptables-persistent)",
+      "pkgs": [
+        "iptables",
+        "iptables-persistent"
+      ]
+    },
+    "check": "dpkg-query 顯示 iptables 與 iptables-persistent 皆為 'install ok installed'。",
+    "fix": "預先設定 debconf 避免互動：`echo iptables-persistent iptables-persistent/autosave_v4 boolean false | debconf-set-selections`（v6 同理），再 DEBIAN_FRONTEND=noninteractive apt-get install -y iptables iptables-persistent。回滾：apt-get purge -y iptables-persistent（iptables 為系統必要套件，不移除）。",
+    "risk": "B",
+    "risk_reason": "安裝 iptables-persistent 會一併移除 ufw（套件衝突），並在開機時載入規則。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Iptables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "Ubuntu 22.04 的 iptables-persistent 與 ufw 有套件衝突，安裝時會移除 ufw（與 0220 結果一致）。iptables 在 22.04 預設為 iptables-nft 後端。"
+  },
+  {
+    "id": "TWGCB-01-014-0219",
+    "category": "Iptables 配置",
+    "title": "nftables 套件",
+    "expected": "移除",
+    "doc_method": "#apt purge nftables",
+    "type": "package_absent",
+    "params": {
+      "pkg": "nftables"
+    },
+    "check": "dpkg-query 顯示 nftables 未安裝（或僅 config-files 狀態）。",
+    "fix": "備份 /etc/nftables.conf，記錄套件與服務狀態；若 nftables.service 啟用中先 disable，再 apt-get purge -y nftables（apt 會列出相依移除清單，若會連帶移除其他套件則停止並回報）。回滾：apt-get install nftables 並還原設定檔與服務狀態。",
+    "risk": "B",
+    "risk_reason": "移除防火牆套件會改變封包過濾機制。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Iptables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "Ubuntu 22.04 的 iptables 雖使用 nf_tables 核心後端（iptables-nft），但只依賴 libnftnl，不依賴 nftables 套件，移除不影響 iptables 運作。"
+  },
+  {
+    "id": "TWGCB-01-014-0220",
+    "category": "Iptables 配置",
+    "title": "ufw 套件",
+    "expected": "移除",
+    "doc_method": "#apt purge ufw",
+    "type": "package_absent",
+    "params": {
+      "pkg": "ufw"
+    },
+    "check": "dpkg-query 顯示 ufw 未安裝（或僅 config-files 狀態）。",
+    "fix": "備份 /etc/ufw/、/etc/default/ufw 與 `iptables-save`/`ip6tables-save` 輸出；若 ufw 為 active，須先確認 iptables 規則已放行 SSH，再 `ufw --force disable` 並 apt-get purge -y ufw。回滾：重新安裝 ufw、還原設定並依原狀態啟用。",
+    "risk": "B",
+    "risk_reason": "移除正在使用的防火牆會改變主機的封包過濾行為。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Iptables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "PDF 中 0219 與 0220 的內容交錯，重組後 0220 為「Iptables 配置 / ufw 套件 / 移除」。若已執行 0218 安裝 iptables-persistent，ufw 通常已被移除。"
+  },
+  {
+    "id": "TWGCB-01-014-0221",
+    "category": "Iptables 配置",
+    "title": "iptables 服務",
+    "expected": "啟用",
+    "doc_method": "#systemctl --now enable iptables",
+    "type": "service_enabled",
+    "params": {
+      "unit": "netfilter-persistent.service",
+      "pkg": "iptables-persistent"
+    },
+    "check": "Ubuntu 22.04 沒有 iptables.service，改檢查 `systemctl is-enabled netfilter-persistent.service` 為 enabled 且 is-active 為 active，並確認 /etc/iptables/rules.v4 存在。",
+    "fix": "備份目前 `iptables-save` 輸出與 /etc/iptables/rules.v4；若 rules.v4 不存在，先以 `iptables-save > /etc/iptables/rules.v4` 保存目前規則（避免開機載入空規則或錯誤規則），再 systemctl --now enable netfilter-persistent。回滾：依原狀態 disable，還原 rules.v4。",
+    "risk": "B",
+    "risk_reason": "啟用後開機會載入 rules.v4，規則有誤可能影響連線。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Iptables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件指令 `systemctl --now enable iptables` 為 RHEL 寫法，Ubuntu 22.04 不存在 iptables.service，對應的是 iptables-persistent 提供的 netfilter-persistent.service。"
+  },
+  {
+    "id": "TWGCB-01-014-0222",
+    "category": "Iptables 配置",
+    "title": "ip6tables 服務",
+    "expected": "啟用",
+    "doc_method": "#systemctl --now enable ip6tables",
+    "type": "service_enabled",
+    "params": {
+      "unit": "netfilter-persistent.service",
+      "pkg": "iptables-persistent"
+    },
+    "check": "Ubuntu 22.04 沒有 ip6tables.service，改檢查 netfilter-persistent.service 為 enabled/active，且 /etc/iptables/rules.v6 存在。",
+    "fix": "備份 `ip6tables-save` 輸出；若 /etc/iptables/rules.v6 不存在，以 `ip6tables-save > /etc/iptables/rules.v6` 保存，再 systemctl --now enable netfilter-persistent。回滾：還原 rules.v6 與服務狀態。",
+    "risk": "B",
+    "risk_reason": "啟用後開機會載入 IPv6 規則，規則有誤可能影響連線。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Iptables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件指令為 RHEL 寫法，Ubuntu 22.04 無 ip6tables.service，IPv4/IPv6 規則都由 netfilter-persistent.service 載入，與 0221 實際檢測同一服務。"
+  },
+  {
+    "id": "TWGCB-01-014-0223",
+    "category": "Iptables 配置",
+    "title": "在 iptables 建立預設拒絕規則",
+    "expected": "Drop",
+    "doc_method": "#iptables -P INPUT DROP；#iptables -P OUTPUT DROP；#iptables -P FORWARD DROP",
+    "type": "custom",
+    "params": {
+      "desc": "iptables INPUT/OUTPUT/FORWARD 預設政策皆為 DROP",
+      "cmd": "iptables -S",
+      "expect": [
+        "-P INPUT DROP",
+        "-P OUTPUT DROP",
+        "-P FORWARD DROP"
+      ]
+    },
+    "check": "`iptables -S` 輸出包含 `-P INPUT DROP`、`-P OUTPUT DROP`、`-P FORWARD DROP`；並確認 /etc/iptables/rules.v4 的 *filter 區段為 `:INPUT DROP`、`:FORWARD DROP`、`:OUTPUT DROP`（重開機後仍有效）。",
+    "fix": "1) `iptables-save > 備份檔`，備份 /etc/iptables/rules.v4。2) 先取得目前 sshd 使用的埠：`sshd -T 2>/dev/null | awk '/^port /{print $2}'`（可能多個），若失敗則用 `ss -tlnpH | grep sshd` 解析，皆失敗才退回 22；另應取得目前 SSH 連線來源（環境變數 SSH_CONNECTION）以確認不會被阻斷。 3) 先加入允許規則（已存在則略過）：`iptables -A INPUT -i lo -j ACCEPT`、`iptables -A OUTPUT -o lo -j ACCEPT`、`iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT`、`iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT`、`iptables -A INPUT -p tcp --dport <ssh埠> -j ACCEPT`，以及使用者確認的必要對外連線（DNS、NTP、套件庫）。4) 執行文件三條 -P DROP 指令。5) 建議先排程延時自動回滾（例如 systemd-run --on-active=120 iptables-restore <備份>），確認 SSH 仍可連線後取消。6) `netfilter-persistent save` 保存。回滾：`iptables-restore < 備份檔` 並還原 rules.v4。",
+    "risk": "B",
+    "risk_reason": "OUTPUT 預設 DROP 且無 ESTABLISHED 規則時，SSH 回應封包會立即被丟棄而斷線。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Iptables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件只列出 -P DROP 指令且未保存，直接照做會立即切斷 SSH 與所有對外連線；應在 0224 回送規則與放行規則之後執行。需放行哪些對外埠屬業務決定。"
+  },
+  {
+    "id": "TWGCB-01-014-0224",
+    "category": "Iptables 配置",
+    "title": "在 iptables 設定回送流量規則",
+    "expected": "建立回送流量規則",
+    "doc_method": "#iptables -A INPUT -i lo -j ACCEPT；#iptables -A OUTPUT -o lo -j ACCEPT；#iptables -A INPUT -s 127.0.0.0/8 -j DROP",
+    "type": "custom",
+    "params": {
+      "desc": "iptables 含三條回送規則且順序正確",
+      "cmd": "iptables -S",
+      "rules": [
+        "-A INPUT -i lo -j ACCEPT",
+        "-A OUTPUT -o lo -j ACCEPT",
+        "-A INPUT -s 127.0.0.0/8 -j DROP"
+      ]
+    },
+    "check": "`iptables -S` 包含 `-A INPUT -i lo -j ACCEPT`、`-A OUTPUT -o lo -j ACCEPT`、`-A INPUT -s 127.0.0.0/8 -j DROP`，且 `-i lo -j ACCEPT` 出現在 `-s 127.0.0.0/8 -j DROP` 之前；/etc/iptables/rules.v4 亦包含相同規則。",
+    "fix": "`iptables-save > 備份檔`。以 `iptables -C` 檢查各規則是否存在，不存在則加入；lo ACCEPT 規則用 `-I INPUT 1` / `-I OUTPUT 1` 插入最前面，127.0.0.0/8 DROP 插在其後（避免被既有 ACCEPT 規則提前放行）。完成後 `netfilter-persistent save`。回滾：`iptables-restore < 備份檔` 並還原 rules.v4。",
+    "risk": "B",
+    "risk_reason": "新增入站 DROP 規則屬防火牆變更，順序錯誤可能阻斷本機回送通訊。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Iptables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件使用 -A 附加，若鏈中已有前置的全開或全拒規則，附加的規則可能無效，實作應用 -I 控制順序。文件未保存規則，需 netfilter-persistent save。"
+  },
+  {
+    "id": "TWGCB-01-014-0225",
+    "category": "Iptables 配置",
+    "title": "在 ip6tables 建立預設拒絕規則",
+    "expected": "Drop",
+    "doc_method": "# ip6tables -P INPUT DROP；# ip6tables -P OUTPUT DROP；# ip6tables -P FORWARD DROP",
+    "type": "custom",
+    "params": {
+      "desc": "ip6tables INPUT/OUTPUT/FORWARD 預設政策皆為 DROP",
+      "cmd": "ip6tables -S",
+      "expect": [
+        "-P INPUT DROP",
+        "-P OUTPUT DROP",
+        "-P FORWARD DROP"
+      ]
+    },
+    "check": "`ip6tables -S` 包含 `-P INPUT DROP`、`-P OUTPUT DROP`、`-P FORWARD DROP`；/etc/iptables/rules.v6 的 *filter 區段三者皆為 DROP。若核心停用 IPv6（/proc/net/if_inet6 不存在或 ipv6.disable=1）則視為不適用。",
+    "fix": "1) `ip6tables-save > 備份檔`，備份 rules.v6。2) 先取得目前 sshd 使用的埠：`sshd -T 2>/dev/null | awk '/^port /{print $2}'`（可能多個），若失敗則用 `ss -tlnpH | grep sshd` 解析，皆失敗才退回 22；另應取得目前 SSH 連線來源（環境變數 SSH_CONNECTION）以確認不會被阻斷。 3) 先加入 `ip6tables -A INPUT -i lo -j ACCEPT`、`ip6tables -A OUTPUT -o lo -j ACCEPT`、INPUT/OUTPUT 的 `-m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT`、`ip6tables -A INPUT -p tcp --dport <ssh埠> -j ACCEPT`；IPv6 還需放行必要的 ICMPv6（鄰居探索 type 133-136，否則 IPv6 網路會中斷）。4) 執行三條 -P DROP。5) 建議延時自動回滾，確認連線正常後取消。6) `netfilter-persistent save`。回滾：`ip6tables-restore < 備份檔` 並還原 rules.v6。",
+    "risk": "B",
+    "risk_reason": "未先放行 SSH、已建立連線與 ICMPv6 時會切斷 IPv6 連線。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Iptables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件未提及 ICMPv6 鄰居探索，直接預設 DROP 會使 IPv6 位址解析失效。"
+  },
+  {
+    "id": "TWGCB-01-014-0226",
+    "category": "Iptables 配置",
+    "title": "在 ip6tables 設定回送流量規則",
+    "expected": "建立回送流量規則",
+    "doc_method": "# ip6tables -A INPUT -i lo -j ACCEPT；# ip6tables -A OUTPUT -o lo -j ACCEPT；# ip6tables -A INPUT -s ::1 -j DROP",
+    "type": "custom",
+    "params": {
+      "desc": "ip6tables 含三條回送規則且順序正確",
+      "cmd": "ip6tables -S",
+      "rules": [
+        "-A INPUT -i lo -j ACCEPT",
+        "-A OUTPUT -o lo -j ACCEPT",
+        "-A INPUT -s ::1/128 -j DROP"
+      ]
+    },
+    "check": "`ip6tables -S` 包含 `-A INPUT -i lo -j ACCEPT`、`-A OUTPUT -o lo -j ACCEPT`、`-A INPUT -s ::1/128 -j DROP`（-S 會將 ::1 顯示為 ::1/128），且 lo ACCEPT 在 DROP 之前；rules.v6 亦包含。IPv6 停用時視為不適用。",
+    "fix": "`ip6tables-save > 備份檔`。以 `ip6tables -C` 檢查，缺少者以 -I 插入（lo ACCEPT 在最前，::1 DROP 在其後），完成後 `netfilter-persistent save`。回滾：`ip6tables-restore < 備份檔` 並還原 rules.v6。",
+    "risk": "B",
+    "risk_reason": "新增入站 DROP 規則屬防火牆變更，順序錯誤可能影響本機通訊。",
+    "needs_reboot": false,
+    "applies_when": "判定為 Iptables 組時適用。防火牆判定（三組擇一）：①ufw 已安裝且已啟用（`ufw status` 顯示 Status: active，或 /etc/ufw/ufw.conf 中 ENABLED=yes）→ UFW 組；②否則 nftables.service 為 enabled 或 active → Nftables 組；③否則 iptables-persistent 已安裝且 netfilter-persistent.service 為 enabled → Iptables 組；④三者皆未使用時（Ubuntu 22.04 Server 預設：ufw 已安裝但 inactive、nftables 已安裝但服務停用）→ 預設套用 UFW 組並判為不合格，修復需使用者確認；另兩組標記為不適用。注意 ufw 啟用後 `nft list ruleset` 也會出現 ufw 的鏈（iptables-nft 後端），不可據此誤判為使用 nftables。",
+    "notes": "文件指令前有「# 」空格，僅為提示字元。ip6tables -S 輸出 ::1/128，比對時需正規化。"
+  },
+  {
+    "id": "TWGCB-01-014-0227",
+    "category": "GNOME 設定",
+    "title": "GNOME 使用者清單",
+    "expected": "true",
+    "doc_method": "編輯 /etc/dconf/profile/gdm：user-db:user、system-db:gdm、file-db:/usr/share/gdm/greeter-dconf-defaults；mkdir /etc/dconf/db/gdm.d/；編輯 /etc/dconf/db/gdm.d/00-login-screen：[org/gnome/login-screen] disable-user-list=true；dconf update",
+    "type": "custom",
+    "params": {
+      "desc": "dconf keyfile 設定",
+      "profile": "/etc/dconf/profile/gdm",
+      "profile_lines": [
+        "user-db:user",
+        "system-db:gdm",
+        "file-db:/usr/share/gdm/greeter-dconf-defaults"
+      ],
+      "db_dir": "/etc/dconf/db/gdm.d",
+      "file": "/etc/dconf/db/gdm.d/00-login-screen",
+      "section": "org/gnome/login-screen",
+      "key": "disable-user-list",
+      "value": "true"
+    },
+    "check": "/etc/dconf/profile/gdm 含 `system-db:gdm`；/etc/dconf/db/gdm.d/ 下任一 keyfile 的 [org/gnome/login-screen] 區段 disable-user-list=true（以 configparser 解析，後讀檔案覆蓋先讀，檔名依字母序）；編譯後的 /etc/dconf/db/gdm 存在且修改時間不早於 gdm.d 內所有檔案。",
+    "fix": "備份 /etc/dconf/profile/gdm 與 /etc/dconf/db/gdm.d/（不存在則記錄為新建）。寫入 profile 三行；mkdir -p /etc/dconf/db/gdm.d；寫入 00-login-screen；執行 `dconf update`（需 dconf-cli 套件）。回滾：還原或刪除新建檔案後再執行 dconf update。",
+    "risk": "A",
+    "risk_reason": "只影響 GDM 登入畫面是否列出使用者，不影響網路與服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 gdm3 時適用（本項設定的是 GDM 登入畫面）；僅有 gnome-shell 而無 gdm3（例如使用 lightdm）時本項不適用；兩者皆未安裝（一般伺服器）時標記為不適用（N/A）。",
+    "notes": "下次顯示登入畫面（GDM 重新啟動或重開機）時生效，不建議自動重啟 gdm3（會中斷桌面工作階段）。Ubuntu 的 gdm3 已在 /usr/share/dconf/profile/gdm 提供同內容的 profile，/etc 下的檔案會覆蓋它。"
+  },
+  {
+    "id": "TWGCB-01-014-0228",
+    "category": "GNOME 設定",
+    "title": "GNOME 使用者會談逾時時間",
+    "expected": "900 秒以下，但須大於 0",
+    "doc_method": "編輯 /etc/dconf/profile/user：user-db:user、system-db:local；mkdir /etc/dconf/db/local.d/；編輯 /etc/dconf/db/local.d/00-screensaver：[org/gnome/desktop/session] idle-delay=uint32 900、[org/gnome/desktop/screensaver] lock-delay=uint32 0；#dconf update",
+    "type": "custom",
+    "params": {
+      "desc": "dconf keyfile 數值範圍",
+      "profile": "/etc/dconf/profile/user",
+      "file": "/etc/dconf/db/local.d/00-screensaver",
+      "settings": [
+        {
+          "section": "org/gnome/desktop/session",
+          "key": "idle-delay",
+          "compare": "range",
+          "min_exclusive": 0,
+          "max": 900,
+          "format": "uint32 N"
+        },
+        {
+          "section": "org/gnome/desktop/screensaver",
+          "key": "lock-delay",
+          "compare": "eq",
+          "value": "uint32 0"
+        }
+      ]
+    },
+    "check": "解析 /etc/dconf/db/local.d/ 下所有 keyfile：[org/gnome/desktop/session] idle-delay 去除 `uint32` 型別前綴後為整數 N，且 0 < N ≤ 900；[org/gnome/desktop/screensaver] lock-delay 為 uint32 0。並確認 /etc/dconf/profile/user 含 `system-db:local`，且編譯後的 /etc/dconf/db/local 存在、修改時間不早於 local.d 內所有檔案（代表已執行 dconf update）。",
+    "fix": "確保 /etc/dconf/profile/user 含有 `user-db:user` 與 `system-db:local` 兩行（若檔案已存在且有其他 system-db 行，以合併方式加入，不覆寫；先備份原檔，原本不存在則記錄為新建以便回滾時刪除）；mkdir -p /etc/dconf/db/local.d；寫入 /etc/dconf/db/local.d/00-screensaver（內容如文件）；執行 `dconf update`。回滾：刪除新建檔案或還原備份後 dconf update。",
+    "risk": "A",
+    "risk_reason": "僅調整桌面閒置鎖定時間，不影響網路與服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 GNOME 桌面時適用：gdm3 或 gnome-shell 套件已安裝（dpkg-query 檢查）；兩者皆未安裝（一般伺服器）時標記為不適用（N/A），不計入不合格。",
+    "notes": "GCB 值只規範 idle-delay，lock-delay=uint32 0 出自設定方法，一併檢查。螢幕鎖定還需 org/gnome/desktop/screensaver lock-enabled 為 true（預設即為 true），文件未提及。新登入的工作階段才會套用。"
+  },
+  {
+    "id": "TWGCB-01-014-0229",
+    "category": "GNOME 設定",
+    "title": "GNOME 使用者會談逾時時間鎖定",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/dconf/profile/user：user-db:user、system-db:local；mkdir -p /etc/dconf/db/local.d/locks；編輯 /etc/dconf/db/local.d/locks/screensaver：/org/gnome/desktop/session/idle-delay、/org/gnome/desktop/screensaver/lock-delay；#dconf update",
+    "type": "custom",
+    "params": {
+      "desc": "dconf locks 檔包含指定路徑",
+      "profile": "/etc/dconf/profile/user",
+      "file": "/etc/dconf/db/local.d/locks/screensaver",
+      "lines": [
+        "/org/gnome/desktop/session/idle-delay",
+        "/org/gnome/desktop/screensaver/lock-delay"
+      ]
+    },
+    "check": "/etc/dconf/db/local.d/locks/ 下任一檔案（忽略註解）包含 `/org/gnome/desktop/session/idle-delay` 與 `/org/gnome/desktop/screensaver/lock-delay` 兩行。並確認 /etc/dconf/profile/user 含 `system-db:local`，且編譯後的 /etc/dconf/db/local 存在、修改時間不早於 local.d 內所有檔案（代表已執行 dconf update）。",
+    "fix": "確保 /etc/dconf/profile/user 含有 `user-db:user` 與 `system-db:local` 兩行（若檔案已存在且有其他 system-db 行，以合併方式加入，不覆寫；先備份原檔，原本不存在則記錄為新建以便回滾時刪除）；mkdir -p /etc/dconf/db/local.d/locks；寫入 /etc/dconf/db/local.d/locks/screensaver（若已存在則備份並只補上缺少的行）；執行 `dconf update`。回滾：還原或刪除該檔後 dconf update。",
+    "risk": "A",
+    "risk_reason": "僅鎖定桌面設定值，不影響網路與服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 GNOME 桌面時適用：gdm3 或 gnome-shell 套件已安裝（dpkg-query 檢查）；兩者皆未安裝（一般伺服器）時標記為不適用（N/A），不計入不合格。",
+    "notes": "PDF 中原則名稱「GNOME 使用者會談逾時時間鎖定」被分頁拆開，已重組。"
+  },
+  {
+    "id": "TWGCB-01-014-0230",
+    "category": "GNOME 設定",
+    "title": "卸除式儲存裝置",
+    "expected": "false",
+    "doc_method": "編輯 /etc/dconf/profile/user：user-db:user、system-db:local；mkdir /etc/dconf/db/local.d/；編輯 /etc/dconf/db/local.d/00-media-automount：[org/gnome/desktop/media-handling] automount=false、automount-open=false；#dconf update",
+    "type": "custom",
+    "params": {
+      "desc": "dconf keyfile 設定",
+      "profile": "/etc/dconf/profile/user",
+      "file": "/etc/dconf/db/local.d/00-media-automount",
+      "section": "org/gnome/desktop/media-handling",
+      "values": {
+        "automount": "false",
+        "automount-open": "false"
+      }
+    },
+    "check": "解析 /etc/dconf/db/local.d/ 下所有 keyfile，[org/gnome/desktop/media-handling] 區段 automount=false 且 automount-open=false。並確認 /etc/dconf/profile/user 含 `system-db:local`，且編譯後的 /etc/dconf/db/local 存在、修改時間不早於 local.d 內所有檔案（代表已執行 dconf update）。",
+    "fix": "確保 /etc/dconf/profile/user 含有 `user-db:user` 與 `system-db:local` 兩行（若檔案已存在且有其他 system-db 行，以合併方式加入，不覆寫；先備份原檔，原本不存在則記錄為新建以便回滾時刪除）；mkdir -p /etc/dconf/db/local.d；寫入 /etc/dconf/db/local.d/00-media-automount（內容如文件）；執行 `dconf update`。回滾：刪除或還原後 dconf update。",
+    "risk": "A",
+    "risk_reason": "僅停用桌面自動掛載，不影響網路與服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 GNOME 桌面時適用：gdm3 或 gnome-shell 套件已安裝（dpkg-query 檢查）；兩者皆未安裝（一般伺服器）時標記為不適用（N/A），不計入不合格。",
+    "notes": "此設定只影響 GNOME 桌面的自動掛載，不會阻止 root 手動 mount 或 udisks 掛載。"
+  },
+  {
+    "id": "TWGCB-01-014-0231",
+    "category": "GNOME 設定",
+    "title": "卸除式儲存裝置鎖定",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/dconf/profile/user：user-db:user、system-db:local；mkdir -p /etc/dconf/db/local.d/locks；編輯 /etc/dconf/db/local.d/locks/media-handling：/org/gnome/desktop/media-handling/automount、/org/gnome/desktop/media-handling/automount-open；#dconf update",
+    "type": "custom",
+    "params": {
+      "desc": "dconf locks 檔包含指定路徑",
+      "profile": "/etc/dconf/profile/user",
+      "file": "/etc/dconf/db/local.d/locks/media-handling",
+      "lines": [
+        "/org/gnome/desktop/media-handling/automount",
+        "/org/gnome/desktop/media-handling/automount-open"
+      ]
+    },
+    "check": "/etc/dconf/db/local.d/locks/ 下任一檔案包含 `/org/gnome/desktop/media-handling/automount` 與 `/org/gnome/desktop/media-handling/automount-open` 兩行。並確認 /etc/dconf/profile/user 含 `system-db:local`，且編譯後的 /etc/dconf/db/local 存在、修改時間不早於 local.d 內所有檔案（代表已執行 dconf update）。",
+    "fix": "確保 /etc/dconf/profile/user 含有 `user-db:user` 與 `system-db:local` 兩行（若檔案已存在且有其他 system-db 行，以合併方式加入，不覆寫；先備份原檔，原本不存在則記錄為新建以便回滾時刪除）；mkdir -p /etc/dconf/db/local.d/locks；在 /etc/dconf/db/local.d/locks/media-handling 中以「缺少才附加」方式加入兩行（不可整檔覆寫，0233 也寫同一檔）；執行 `dconf update`。回滾：還原備份或移除新增的行後 dconf update。",
+    "risk": "A",
+    "risk_reason": "僅鎖定桌面設定值，不影響網路與服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 GNOME 桌面時適用：gdm3 或 gnome-shell 套件已安裝（dpkg-query 檢查）；兩者皆未安裝（一般伺服器）時標記為不適用（N/A），不計入不合格。",
+    "notes": "0231 與 0233 都要求寫入同一個 locks/media-handling 檔案，實作必須以附加/合併方式處理，否則後執行的規則會覆蓋前者；回滾時也要只移除自己新增的行。"
+  },
+  {
+    "id": "TWGCB-01-014-0232",
+    "category": "GNOME 設定",
+    "title": "Autorun",
+    "expected": "true",
+    "doc_method": "編輯 /etc/dconf/profile/user：user-db:user、system-db:local；mkdir /etc/dconf/db/local.d/；編輯 /etc/dconf/db/local.d/00-media-autorun：[org/gnome/desktop/media-handling] autorun-never=true；#dconf update",
+    "type": "custom",
+    "params": {
+      "desc": "dconf keyfile 設定",
+      "profile": "/etc/dconf/profile/user",
+      "file": "/etc/dconf/db/local.d/00-media-autorun",
+      "section": "org/gnome/desktop/media-handling",
+      "key": "autorun-never",
+      "value": "true"
+    },
+    "check": "解析 /etc/dconf/db/local.d/ 下所有 keyfile，[org/gnome/desktop/media-handling] 區段 autorun-never=true。並確認 /etc/dconf/profile/user 含 `system-db:local`，且編譯後的 /etc/dconf/db/local 存在、修改時間不早於 local.d 內所有檔案（代表已執行 dconf update）。",
+    "fix": "確保 /etc/dconf/profile/user 含有 `user-db:user` 與 `system-db:local` 兩行（若檔案已存在且有其他 system-db 行，以合併方式加入，不覆寫；先備份原檔，原本不存在則記錄為新建以便回滾時刪除）；mkdir -p /etc/dconf/db/local.d；寫入 /etc/dconf/db/local.d/00-media-autorun；執行 `dconf update`。回滾：刪除或還原後 dconf update。",
+    "risk": "A",
+    "risk_reason": "僅停用桌面 Autorun，不影響網路與服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 GNOME 桌面時適用：gdm3 或 gnome-shell 套件已安裝（dpkg-query 檢查）；兩者皆未安裝（一般伺服器）時標記為不適用（N/A），不計入不合格。",
+    "notes": "PDF 中本項的 TWGCB-ID 與部分設定方法被分頁拆開，已重組。"
+  },
+  {
+    "id": "TWGCB-01-014-0233",
+    "category": "GNOME 設定",
+    "title": "Autorun 鎖定",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/dconf/profile/user：user-db:user、system-db:local；mkdir -p /etc/dconf/db/local.d/locks；編輯 /etc/dconf/db/local.d/locks/media-handling：/org/gnome/desktop/media-handling/autorun-never；#dconf update",
+    "type": "custom",
+    "params": {
+      "desc": "dconf locks 檔包含指定路徑",
+      "profile": "/etc/dconf/profile/user",
+      "file": "/etc/dconf/db/local.d/locks/media-handling",
+      "lines": [
+        "/org/gnome/desktop/media-handling/autorun-never"
+      ]
+    },
+    "check": "/etc/dconf/db/local.d/locks/ 下任一檔案包含 `/org/gnome/desktop/media-handling/autorun-never`。並確認 /etc/dconf/profile/user 含 `system-db:local`，且編譯後的 /etc/dconf/db/local 存在、修改時間不早於 local.d 內所有檔案（代表已執行 dconf update）。",
+    "fix": "確保 /etc/dconf/profile/user 含有 `user-db:user` 與 `system-db:local` 兩行（若檔案已存在且有其他 system-db 行，以合併方式加入，不覆寫；先備份原檔，原本不存在則記錄為新建以便回滾時刪除）；mkdir -p /etc/dconf/db/local.d/locks；在 /etc/dconf/db/local.d/locks/media-handling 以「缺少才附加」方式加入該行（與 0231 共用檔案，不可覆寫）；執行 `dconf update`。回滾：只移除本規則新增的行後 dconf update。",
+    "risk": "A",
+    "risk_reason": "僅鎖定桌面設定值，不影響網路與服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 GNOME 桌面時適用：gdm3 或 gnome-shell 套件已安裝（dpkg-query 檢查）；兩者皆未安裝（一般伺服器）時標記為不適用（N/A），不計入不合格。",
+    "notes": "說明欄寫「鎖定自動掛載卸除式儲存裝置設定值」，應為從 0231 複製的筆誤，本項實際鎖定的是 autorun-never。與 0231 共用 locks/media-handling 檔案。"
+  },
+  {
+    "id": "TWGCB-01-014-0234",
+    "category": "GNOME 設定",
+    "title": "XDMCP 協定",
+    "expected": "false",
+    "doc_method": "#vim /etc/gdm3/custom.conf，加入：[xdmcp] Enable=false",
+    "type": "custom",
+    "params": {
+      "desc": "INI 區段設定",
+      "path": "/etc/gdm3/custom.conf",
+      "section": "xdmcp",
+      "key": "Enable",
+      "value": "false",
+      "compare": "eq"
+    },
+    "check": "以 configparser（保留大小寫）解析 /etc/gdm3/custom.conf，[xdmcp] 區段 Enable 值（不分大小寫）為 false 即合格；未設定時 GDM 預設也是停用，但 GCB 要求明確設定，判為不合格（可標註「實際未啟用」）。",
+    "fix": "備份 /etc/gdm3/custom.conf；在 [xdmcp] 區段新增或修改 `Enable=false`（區段不存在則新增），以逐行編輯保留原有註解。回滾：還原備份。",
+    "risk": "A",
+    "risk_reason": "停用未加密的遠端顯示協定，Ubuntu 預設即未啟用，不影響 SSH。",
+    "needs_reboot": true,
+    "applies_when": "已安裝 gdm3 時適用（本項設定的是 GDM 登入畫面）；僅有 gnome-shell 而無 gdm3（例如使用 lightdm）時本項不適用；兩者皆未安裝（一般伺服器）時標記為不適用（N/A）。",
+    "notes": "需重新啟動 gdm3 或重開機才生效；重啟 gdm3 會結束目前所有桌面工作階段，不應自動執行。Ubuntu 22.04 預設 custom.conf 有空的 [xdmcp] 區段。"
+  }
+]

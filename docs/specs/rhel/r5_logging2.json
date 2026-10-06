@@ -1,0 +1,793 @@
+[
+  {
+    "key": "audit_mounts",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0157",
+      "rhel9": "TWGCB-01-012-0157"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄變更檔案系統掛載事件",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts ／ -a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts",
+        "-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=4294967295 -k mounts"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-mounts.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-mounts.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "說明文字提到 mount 與 umount，但設定內容只監控 mount 系統呼叫，以設定內容為準。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_privileged_cmds",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0158",
+      "rhel9": "TWGCB-01-012-0158"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄特權指令使用情形",
+    "expected": "啟用",
+    "doc_method": "對每個磁區執行 find (partition) -xdev \\( -perm -4000 -o -perm -2000 \\) -type f | awk '{print \"-a always,exit -F path=\" $1 \" -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged\" }'，根磁區範例：find / -xdev \\( -perm -4000 -o -perm -2000 \\) -type f | awk '{print \"-a always,exit -F path=\" $1 \" -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged\" }' >> /etc/audit/rules.d/privileged.rules；augenrules --load；auditctl -s | grep enabled。",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "rule_template": "-a always,exit -F path=<檔案> -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged",
+      "file": "/etc/audit/rules.d/privileged.rules",
+      "uid_min_dynamic": true,
+      "description": "動態產生：所有本機實體檔案系統上的 setuid/setgid 一般檔案，每個檔案一條 path 規則"
+    },
+    "check": "列出本機掛載的實體檔案系統（findmnt -n -l -k -o TARGET,FSTYPE，排除 /proc/filesystems 中標記 nodev 的類型與 noexec 掛載點），對每個掛載點執行 find <mnt> -xdev \\( -perm -4000 -o -perm -2000 \\) -type f；每個結果都必須在 rules.d 與 auditctl -l 中有對應的 -F path=<檔案> -F perm=x 且 auid>=UID_MIN、key=privileged 的規則。(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "以上述清單產生規則，覆寫工具專用檔 /etc/audit/rules.d/privileged.rules（若檔案已存在先備份），執行 augenrules --load。回滾：還原備份或刪除檔案後 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則；特權檔案多時會增加稽核量",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "新安裝套件後會出現新的 setuid/setgid 檔案，檢測結果會隨時間變化，修復需重新產生。不存在的 path 規則（套件已移除）會讓 augenrules 載入出錯，重新產生時應移除。find 只掃根目錄會漏掉獨立的 /usr、/var 等分割區，需逐一掃描。"
+  },
+  {
+    "key": "audit_delete",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0159",
+      "rhel9": "TWGCB-01-012-0159"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄檔案刪除事件",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F arch=b64 -S unlink -S unlinkat -S rename -S renameat -S rmdir -F auid>=1000 -F auid!=4294967295 -k delete ／ -a always,exit -F arch=b32 -S unlink -S unlinkat -S rename -S renameat -S rmdir -F auid>=1000 -F auid!=4294967295 -k delete；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b64 -S unlink -S unlinkat -S rename -S renameat -S rmdir -F auid>=1000 -F auid!=4294967295 -k delete",
+        "-a always,exit -F arch=b32 -S unlink -S unlinkat -S rename -S renameat -S rmdir -F auid>=1000 -F auid!=4294967295 -k delete"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-delete.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-delete.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "RHEL 9 PDF 的 b32 行有「renameat-S」斷行黏字，已修正為「renameat -S」。aarch64 的 b64 沒有 unlink、rename、rmdir 系統呼叫，該平台只能用 unlinkat、renameat。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_modules",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0160",
+      "rhel9": "TWGCB-01-012-0160"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄核心模組掛載與卸載事件",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-w /sbin/insmod -p x -k modules ／ -w /sbin/rmmod -p x -k modules ／ -w /sbin/modprobe -p x -k modules ／ -a always,exit -F arch=b64 -S init_module -S delete_module -k modules ／ -a always,exit -F arch=b32 -S init_module -S delete_module -k modules；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /sbin/insmod -p x -k modules",
+        "-w /sbin/rmmod -p x -k modules",
+        "-w /sbin/modprobe -p x -k modules",
+        "-a always,exit -F arch=b64 -S init_module -S delete_module -k modules",
+        "-a always,exit -F arch=b32 -S init_module -S delete_module -k modules"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-modules.rules",
+      "uid_min_dynamic": false
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-modules.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "RHEL 8/9 的 /sbin 是指向 /usr/sbin 的連結，insmod/rmmod/modprobe 又是指向 /usr/bin/kmod 的連結；對連結檔設 -w -p x 實務上可能抓不到執行事件，實際監控效果依賴 init_module/delete_module 系統呼叫規則與 0170 的 kmod 規則。檢測照文件字面比對。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_sudo_log",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0161",
+      "rhel9": "TWGCB-01-012-0161"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄系統管理者活動日誌變更",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-w /var/log/sudo.log -p wa -k actions；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。先以 grep -r logfile /etc/sudoers* | sed -e 's/.*logfile=//;s/,? .*//' 找 sudo 日誌路徑，規則為 -w (sudo 日誌檔案路徑) -p wa -k actions，文件寫入 /etc/audit/rules.d/actions.rules。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /var/log/sudo.log -p wa -k actions"
+      ],
+      "file": "/etc/audit/rules.d/actions.rules",
+      "uid_min_dynamic": false,
+      "logfile_source": "sudoers Defaults logfile=，未設定則 /var/log/sudo.log"
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。sudo 日誌路徑取自 /etc/sudoers 與 /etc/sudoers.d/* 的 Defaults logfile=；未設定時以 /var/log/sudo.log 檢查。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/actions.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "RHEL 預設 sudoers 沒有設定 logfile，sudo 只寫 journal/secure，所以 /var/log/sudo.log 通常不存在；監控不存在的檔案在父目錄存在時仍可載入。文件的 sed 用 BRE，「,?」中的 ? 被當成字面字元，取路徑可能不正確，實作請用 Python 正規表示式解析。是否同時加入 Defaults logfile=/var/log/sudo.log 文件未要求。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_chcon",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0162",
+      "rhel9": "TWGCB-01-012-0162"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 chcon 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=4294967295 -k perm_chng；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=4294967295 -k perm_chng"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-perm_chng.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-perm_chng.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_ssh_agent",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0163",
+      "rhel9": "TWGCB-01-012-0163"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 ssh-agent 程序使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F path=/usr/bin/ssh-agent -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-ssh；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/usr/bin/ssh-agent -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-ssh"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-privileged.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-privileged.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "PDF 斷行為「ssh- agent」「privileged- ssh」，已修正。ssh-agent 屬 openssh-clients，未安裝時 path 規則載入會失敗，應判定為不適用或略過。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_unix_update",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0164",
+      "rhel9": "TWGCB-01-012-0164"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 unix_update 程序使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F path=/sbin/unix_update -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-unix-update；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/sbin/unix_update -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-unix-update"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-privileged.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-privileged.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "PDF 斷行為「privileged- unix-update」，已修正。/sbin 是 /usr/sbin 的連結，檢測時 /sbin/unix_update 與 /usr/sbin/unix_update 應視為相同。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_setfacl",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0165",
+      "rhel9": "TWGCB-01-012-0165"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 setfacl 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=4294967295 -k perm_chng；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=4294967295 -k perm_chng"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-perm_chng.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-perm_chng.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_finit_module",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0166",
+      "rhel9": "TWGCB-01-012-0166"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 finit_module 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F arch=b32 -S finit_module -F auid>=1000 -F auid!=4294967295 -k module_chng ／ -a always,exit -F arch=b64 -S finit_module -F auid>=1000 -F auid!=4294967295 -k module_chng；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b32 -S finit_module -F auid>=1000 -F auid!=4294967295 -k module_chng",
+        "-a always,exit -F arch=b64 -S finit_module -F auid>=1000 -F auid!=4294967295 -k module_chng"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-modules.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-modules.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "finit_module 實為系統呼叫而非指令；只記錄 auid>=UID_MIN 的使用者，root 開機載入的模組不會被記錄。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_open_by_handle_at",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0167",
+      "rhel9": "TWGCB-01-012-0167"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 open_by_handle_at 系統呼叫使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F arch=b32 -S open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k perm_access ／ -a always,exit -F arch=b64 -S open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k perm_access ／ -a always,exit -F arch=b32 -S open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k perm_access ／ -a always,exit -F arch=b64 -S open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k perm_access；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b32 -S open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k perm_access",
+        "-a always,exit -F arch=b64 -S open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=4294967295 -k perm_access",
+        "-a always,exit -F arch=b32 -S open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k perm_access",
+        "-a always,exit -F arch=b64 -S open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=4294967295 -k perm_access"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-perm_access.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-perm_access.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "PDF 斷行為「exit=- EPERM」「exit=- EACCES」，已修正為 exit=-EPERM、exit=-EACCES。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_usermod",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0168",
+      "rhel9": "TWGCB-01-012-0168"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 usermod 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-usermod；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=4294967295 -k privileged-usermod"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-privileged.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-privileged.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "PDF 斷行為「privileged- usermod」，已修正。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_chacl",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0169",
+      "rhel9": "TWGCB-01-012-0169"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 chacl 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=4294967295 -k perm_chng；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=4294967295 -k perm_chng"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-perm_chng.rules",
+      "uid_min_dynamic": true
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-perm_chng.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "chacl 屬 acl 套件，最小安裝通常已有；未安裝時 path 規則載入會失敗。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_kmod",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0170",
+      "rhel9": "TWGCB-01-012-0170"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 kmod 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-w /bin/kmod -p x -k modules；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /bin/kmod -p x -k modules"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-modules.rules",
+      "uid_min_dynamic": false
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-modules.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "/bin 是 /usr/bin 的連結，檢測時 /bin/kmod 與 /usr/bin/kmod 應視為相同。此規則無 auid 條件。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_faillock",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0171",
+      "rhel9": "TWGCB-01-012-0171"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 Pam_Faillock 日誌檔案",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-w /var/log/faillock -p wa -k logins；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /var/log/faillock -p wa -k logins"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-logins.rules",
+      "uid_min_dynamic": false
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-logins.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "RHEL 8/9 的 pam_faillock 預設紀錄目錄是 /var/run/faillock，除非 /etc/security/faillock.conf 設定 dir = /var/log/faillock；若未改 dir，此規則監控的是不存在的路徑，實質無效。建議在報告中提示，並可同時監控 faillock.conf 中 dir 的實際值。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_execve_priv",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0172",
+      "rhel9": "TWGCB-01-012-0172"
+    },
+    "category": "日誌與稽核",
+    "title": "記錄 execve 系統呼叫使用情形",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯「audit.rules」，加入：-a always,exit -F arch=b32 -F auid!=unset -S execve -C uid!=euid -F key=execpriv ／ -a always,exit -F arch=b64 -F auid!=unset -S execve -C uid!=euid -F key=execpriv ／ -a always,exit -F arch=b32 -F auid!=unset -S execve -C gid!=egid -F key=execpriv ／ -a always,exit -F arch=b64 -F auid!=unset -S execve -C gid!=egid -F key=execpriv；執行 augenrules --load 載入；auditctl -s | grep enabled 若為 enabled 2 表示已鎖定需重開機。",
+    "version_diff": "",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b32 -F auid!=unset -S execve -C uid!=euid -F key=execpriv",
+        "-a always,exit -F arch=b64 -F auid!=unset -S execve -C uid!=euid -F key=execpriv",
+        "-a always,exit -F arch=b32 -F auid!=unset -S execve -C gid!=egid -F key=execpriv",
+        "-a always,exit -F arch=b64 -F auid!=unset -S execve -C gid!=egid -F key=execpriv"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-execpriv.rules",
+      "uid_min_dynamic": false
+    },
+    "check": "(1) 磁碟設定：彙整 /etc/audit/rules.d/*.rules 非註解行，正規化後比對每一條規則是否存在；(2) 執行中規則：解析 auditctl -l，正規化後比對。正規化要點：-k X 與 -F key=X 視為相同；auid!=4294967295、auid!=-1、auid!=unset 視為相同；-S 多個 syscall 可能被合併成逗號清單且順序不同，以集合比較；欄位(-F)順序不計；path 規則在 auditctl -l 會多出 -S all；auid>= 的值須等於 /etc/login.defs 的 UID_MIN（預設 1000）。磁碟有而執行中沒有且 auditctl -s 為 enabled 2 時，判定為「已設定、待重開機生效」。",
+    "fix": "若規則尚不存在，寫入工具專用檔 /etc/audit/rules.d/50-gcb-execpriv.rules（逐行寫入 params.rules），再執行 augenrules --load。auid>=1000 依 awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs 的值替換。新增檔案不需備份，回滾＝刪除該檔後執行 augenrules --load。若 auditctl -s 顯示 enabled 2（不變模式已鎖定），augenrules --load 會失敗，須重開機才生效，回報為待重開機。",
+    "risk": "A",
+    "risk_reason": "只新增稽核規則，不影響服務運作",
+    "needs_reboot": false,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "此規則用 auid!=unset 而非 4294967295，兩者等價。setuid 程式執行頻繁時會產生大量紀錄，需留意日誌容量。 非 x86_64 平台（aarch64、s390x、ppc64le）不支援 arch=b32，應只產生 b64 規則，否則 augenrules 載入會出錯。"
+  },
+  {
+    "key": "audit_immutable",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0173",
+      "rhel9": "TWGCB-01-012-0173"
+    },
+    "category": "日誌與稽核",
+    "title": "auditd 設定不變模式",
+    "expected": "2",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯最後被執行的「.rules」檔案，於最後加入兩行：-e 2 ／ --loginuid-immutable；以 grep -h \"^\\s*[^#]\" /etc/audit/rules.d/*.rules | egrep \"(-e 2)|(--loginuid-immutable)\" 確認兩者都出現。",
+    "version_diff": "內容相同；RHEL 9 PDF 將兩行黏成「-e 2--loginuid-immutable」並註明為 2 行，RHEL 8 PDF 寫成「-e 2 --loginuid-immutable」，實際都是兩行設定。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "--loginuid-immutable",
+        "-e 2"
+      ],
+      "file": "/etc/audit/rules.d/99-finalize.rules"
+    },
+    "check": "磁碟：rules.d/*.rules 非註解行中同時有 --loginuid-immutable 與 -e 2，且 -e 2 是最後生效的 -e 設定（不可被後面的 -e 0/-e 1 覆蓋）；執行中：auditctl -s 顯示 enabled 2 且 loginuid_immutable 1（RHEL 8/9 auditctl -s 會顯示 loginuid_immutable 欄位）。磁碟已設定但執行中不是 2，判定為待重開機。",
+    "fix": "此項必須排在所有其他稽核規則修復之後最後執行。寫入 /etc/audit/rules.d/99-finalize.rules，內容依序為 --loginuid-immutable、-e 2（-e 2 必須在最後，鎖定後其他設定都會被拒絕）。建議不立即 augenrules --load，而是提示重開機生效，避免鎖定後本次執行的其他稽核修復無法再調整。回滾：刪除該檔案，但已鎖定時只能在重開機後才恢復可變更狀態。",
+    "risk": "B",
+    "risk_reason": "啟用後任何稽核規則的新增、修改、回滾都必須重開機才生效，且 loginuid 不可變可能影響容器",
+    "needs_reboot": true,
+    "applies_when": "已安裝 audit 套件且 auditd 啟用",
+    "existing": false,
+    "notes": "文件寫的順序是先 -e 2 再 --loginuid-immutable，但鎖定後 --loginuid-immutable 會被核心拒絕；augenrules 會自動把最後一個 -e 移到檔尾，仍建議檔案內就把 -e 2 放最後。工具的「修復後重新檢測」若在鎖定後執行，其他稽核規則的執行中檢測可能顯示未生效，應依 enabled 2 判斷為待重開機。使用 podman/systemd-nspawn 等容器的主機，--loginuid-immutable 可能導致容器內登入異常。"
+  },
+  {
+    "key": "rsyslog_installed",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0174",
+      "rhel9": "TWGCB-01-012-0174"
+    },
+    "category": "日誌與稽核",
+    "title": "rsyslog 套件",
+    "expected": "安裝",
+    "doc_method": "dnf install rsyslog",
+    "version_diff": "",
+    "type": "package_present",
+    "params": {
+      "pkg": "rsyslog"
+    },
+    "check": "rpm -q rsyslog 回傳 0 即符合。",
+    "fix": "dnf -y install rsyslog；回滾：記錄原本未安裝，回滾時 dnf -y remove rsyslog（通常不建議回滾）。",
+    "risk": "A",
+    "risk_reason": "安裝系統標準日誌套件，不影響既有服務",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "需可用的 dnf 套件庫；離線環境安裝會失敗，應回報為無法修復。RHEL/Rocky/Alma 預設皆已安裝。"
+  },
+  {
+    "key": "rsyslog_service",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0175",
+      "rhel9": "TWGCB-01-012-0175"
+    },
+    "category": "日誌與稽核",
+    "title": "rsyslog 服務",
+    "expected": "啟用",
+    "doc_method": "systemctl --now enable rsyslog",
+    "version_diff": "",
+    "type": "service_enabled",
+    "params": {
+      "unit": "rsyslog.service",
+      "pkg": "rsyslog"
+    },
+    "check": "systemctl is-enabled rsyslog 為 enabled 且 systemctl is-active rsyslog 為 active。",
+    "fix": "systemctl --now enable rsyslog；備份原本 enabled/active 狀態，回滾時依原狀態 disable/stop。",
+    "risk": "A",
+    "risk_reason": "啟用標準日誌服務",
+    "needs_reboot": false,
+    "applies_when": "已安裝 rsyslog",
+    "existing": true,
+    "notes": ""
+  },
+  {
+    "key": "rsyslog_filecreatemode",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0176",
+      "rhel9": "TWGCB-01-012-0176"
+    },
+    "category": "日誌與稽核",
+    "title": "設定 rsyslog 日誌檔案預設權限",
+    "expected": "0640 或更低權限",
+    "doc_method": "編輯 /etc/rsyslog.conf 與 /etc/rsyslog.d/*.conf，設定 $FileCreateMode 0640",
+    "version_diff": "",
+    "type": "kv_config",
+    "params": {
+      "path": [
+        "/etc/rsyslog.conf",
+        "/etc/rsyslog.d/*.conf"
+      ],
+      "key": "$FileCreateMode",
+      "value": "0640",
+      "compare": "le（八進位權限位元不得超出 0640）",
+      "separator": "空白",
+      "dropin": "/etc/rsyslog.d/00-gcb-filecreatemode.conf"
+    },
+    "check": "讀取 /etc/rsyslog.conf 與 /etc/rsyslog.d/*.conf（依 include 順序）所有非註解的 $FileCreateMode 行，至少要有一行，且每一個出現的值都必須是 0640 的子集（mode & ~0o640 == 0）。未設定時 rsyslog 預設 0644，判定不符合。另可檢查 RainerScript 寫法 action(... fileCreateMode=\"...\") 的值。",
+    "fix": "建立 /etc/rsyslog.d/00-gcb-filecreatemode.conf，內容 $FileCreateMode 0640；若既有檔案有大於 0640 的值，備份該檔後將該行改為 0640。執行 rsyslogd -N1 驗證設定語法，再 systemctl restart rsyslog。回滾：刪除新檔、還原備份、重啟 rsyslog。",
+    "risk": "A",
+    "risk_reason": "只影響之後新建日誌檔的權限",
+    "needs_reboot": false,
+    "applies_when": "已安裝 rsyslog",
+    "existing": false,
+    "notes": "$FileCreateMode 只對其後宣告的 action 生效；RHEL 8/9 預設 rsyslog.conf 的 include /etc/rsyslog.d/*.conf 位於 RULES 之前，drop-in 會生效。既有日誌檔的權限不會改變。文件未要求重啟 rsyslog，但實際需重啟才生效。"
+  },
+  {
+    "key": "rsyslog_secure_rule",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0177",
+      "rhel9": "TWGCB-01-012-0177"
+    },
+    "category": "日誌與稽核",
+    "title": "設定 rsyslog 日誌記錄規則",
+    "expected": "auth、authpriv 及 daemon",
+    "doc_method": "編輯 /etc/rsyslog.conf 與 /etc/rsyslog.d/*.conf，新增或修改為：auth.*,authpriv.*,daemon.* /var/log/secure；systemctl restart rsyslog.service",
+    "version_diff": "內容相同；RHEL 9 PDF 寫成「authpriv.* ,daemon.*」多一個空白，屬排版錯誤，正確為 auth.*,authpriv.*,daemon.*。",
+    "type": "custom",
+    "params": {
+      "line": "auth.*,authpriv.*,daemon.* /var/log/secure",
+      "paths": [
+        "/etc/rsyslog.conf",
+        "/etc/rsyslog.d/*.conf"
+      ],
+      "dropin": "/etc/rsyslog.d/50-gcb-secure.conf",
+      "description": "解析 rsyslog selector，確認 auth、authpriv、daemon 三個 facility 的全部等級都寫到 /var/log/secure"
+    },
+    "check": "解析所有非註解的 legacy selector 行（selector 與 action 以空白分隔，selector 以 ; 分隔、facility 以 , 分隔），確認 auth、authpriv、daemon 三者各自都有 .* 等級（或 .debug 以上）的規則寫到 /var/log/secure（action 可帶前置 -）；可分散在不同行。",
+    "fix": "建立 /etc/rsyslog.d/50-gcb-secure.conf，內容 auth.*,authpriv.*,daemon.* /var/log/secure；rsyslogd -N1 驗證後 systemctl restart rsyslog。回滾：刪除該檔並重啟 rsyslog。",
+    "risk": "A",
+    "risk_reason": "只新增日誌輸出規則",
+    "needs_reboot": false,
+    "applies_when": "已安裝 rsyslog",
+    "existing": false,
+    "notes": "RHEL 預設只有 authpriv.* /var/log/secure；加入 daemon.* 後 /var/log/secure 量會明顯增加，且 daemon 訊息同時仍寫入 /var/log/messages。"
+  },
+  {
+    "key": "var_log_messages_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0178",
+      "rhel9": "TWGCB-01-012-0178"
+    },
+    "category": "日誌與稽核",
+    "title": "/var/log/messages 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "chown root:root /var/log/messages",
+    "version_diff": "",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/var/log/messages"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "os.stat(/var/log/messages) 的 uid 為 0 且 gid 為 0；檔案不存在時判定不適用（rsyslog 未寫此檔）。",
+    "fix": "備份原 uid/gid，執行 chown root:root /var/log/messages；回滾時還原原 uid/gid。",
+    "risk": "A",
+    "risk_reason": "只調整擁有者，rsyslog 以 root 寫入不受影響",
+    "needs_reboot": false,
+    "applies_when": "/var/log/messages 存在",
+    "existing": false,
+    "notes": "只要求擁有者，不要求權限。logrotate 新建的 messages 檔由 rsyslog 以 root 建立，RHEL 預設即為 root:root。"
+  },
+  {
+    "key": "var_log_dir_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0179",
+      "rhel9": "TWGCB-01-012-0179"
+    },
+    "category": "日誌與稽核",
+    "title": "/var/log 目錄所有權",
+    "expected": "root:root",
+    "doc_method": "chown root:root /var/log",
+    "version_diff": "",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/var/log"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "os.stat(/var/log) 的 uid 為 0 且 gid 為 0；檔案不存在時判定不符合。",
+    "fix": "備份原 uid/gid，執行 chown root:root /var/log；回滾時還原原 uid/gid。",
+    "risk": "A",
+    "risk_reason": "只調整擁有者，rsyslog 以 root 寫入不受影響",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "非遞迴；RHEL 預設即為 root:root。"
+  },
+  {
+    "key": "journald_forward_to_syslog",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0180",
+      "rhel9": null
+    },
+    "category": "日誌與稽核",
+    "title": "設定 journald 將日誌發送到 rsyslog",
+    "expected": "yes",
+    "doc_method": "編輯 /etc/systemd/journald.conf，新增 ForwardToSyslog=yes；systemctl restart systemd-journald",
+    "version_diff": "僅 RHEL 8 有此項；RHEL 9 文件跳過編號 TWGCB-01-012-0180，沒有此規則。",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/systemd/journald.conf",
+      "key": "ForwardToSyslog",
+      "value": "yes",
+      "compare": "eq",
+      "separator": "=",
+      "dropin": "/etc/systemd/journald.conf.d/60-gcb.conf",
+      "section": "[Journal]"
+    },
+    "check": "取得有效值：依 systemd 規則合併 /usr/lib/systemd/journald.conf.d、/etc/systemd/journald.conf、/etc/systemd/journald.conf.d/*.conf、/run/systemd/journald.conf.d/*.conf（可用 systemd-analyze cat-config systemd/journald.conf 取得），[Journal] 段最後一個 ForwardToSyslog 值須為 yes（不分大小寫，接受 yes/true/1/on）。",
+    "fix": "建立 /etc/systemd/journald.conf.d/60-gcb.conf（目錄不存在則建立），內容 [Journal] 與 ForwardToSyslog=yes；systemctl restart systemd-journald。若 journald.conf 已有 ForwardToSyslog=no 會被 drop-in 覆蓋，不需改主檔。回滾：刪除 drop-in 並重啟 systemd-journald。",
+    "risk": "A",
+    "risk_reason": "只改 journald 轉送設定",
+    "needs_reboot": false,
+    "applies_when": "RHEL 8",
+    "existing": false,
+    "notes": "RHEL 8 的 rsyslog 預設以 imjournal 從 journal 讀取，且關閉本機 syslog socket（imuxsock SysSock.Use=off），所以開啟 ForwardToSyslog 通常不會造成重複紀錄，只是實質效果有限。文件直接改主檔，實作改用 drop-in（RHEL 8 的 systemd 239 支援）。"
+  },
+  {
+    "key": "journald_compress",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0181",
+      "rhel9": "TWGCB-01-012-0181"
+    },
+    "category": "日誌與稽核",
+    "title": "設定 journald 壓縮日誌檔案",
+    "expected": "yes",
+    "doc_method": "編輯 /etc/systemd/journald.conf，新增 Compress=yes；systemctl restart systemd-journald",
+    "version_diff": "內容相同；RHEL 9 編號因跳過 0180 而與 RHEL 8 相同（0181、0182）。",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/systemd/journald.conf",
+      "key": "Compress",
+      "value": "yes",
+      "compare": "eq",
+      "separator": "=",
+      "dropin": "/etc/systemd/journald.conf.d/60-gcb.conf",
+      "section": "[Journal]"
+    },
+    "check": "合併 journald.conf 與各 journald.conf.d 的有效設定（同 journald_forward_to_syslog），[Journal] 段 Compress 最後有效值須為 yes。",
+    "fix": "在 /etc/systemd/journald.conf.d/60-gcb.conf 的 [Journal] 段寫入 Compress=yes（與其他 journald 項目共用同一 drop-in，寫入前備份），systemctl restart systemd-journald。回滾：還原或刪除 drop-in 並重啟 systemd-journald。",
+    "risk": "A",
+    "risk_reason": "只改 journald 儲存設定",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "systemd 預設即為 Compress=yes，多數主機已符合；未明確設定時以預設值判定為符合，或依工具政策要求明確寫入。"
+  },
+  {
+    "key": "journald_persistent",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0182",
+      "rhel9": "TWGCB-01-012-0182"
+    },
+    "category": "日誌與稽核",
+    "title": "設定 journald 將日誌檔案永久保存於磁碟",
+    "expected": "persistent",
+    "doc_method": "編輯 /etc/systemd/journald.conf，新增 Storage=persistent；systemctl restart systemd-journald",
+    "version_diff": "內容相同；RHEL 9 編號因跳過 0180 而與 RHEL 8 相同（0181、0182）。",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/systemd/journald.conf",
+      "key": "Storage",
+      "value": "persistent",
+      "compare": "eq",
+      "separator": "=",
+      "dropin": "/etc/systemd/journald.conf.d/60-gcb.conf",
+      "section": "[Journal]"
+    },
+    "check": "合併 journald.conf 與各 journald.conf.d 的有效設定（同 journald_forward_to_syslog），[Journal] 段 Storage 最後有效值須為 persistent。",
+    "fix": "在 /etc/systemd/journald.conf.d/60-gcb.conf 的 [Journal] 段寫入 Storage=persistent（與其他 journald 項目共用同一 drop-in，寫入前備份），systemctl restart systemd-journald。回滾：還原或刪除 drop-in 並重啟 systemd-journald。",
+    "risk": "A",
+    "risk_reason": "只改 journald 儲存設定",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "預設 Storage=auto，/var/log/journal 不存在時只存於記憶體。改為 persistent 後會建立 /var/log/journal 並佔用磁碟（預設上限為檔案系統 10%），需注意 /var 容量。"
+  },
+  {
+    "key": "rsyslog_logrotate",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0308"
+    },
+    "category": "日誌與稽核",
+    "title": "rsyslog logrotate",
+    "expected": "啟用",
+    "doc_method": "mkdir -p /var/log/rsyslog；chmod 750 /var/log/rsyslog；編輯 /etc/logrotate.d/rsyslog 新增或修改：/var/log/rsyslog/*.log {\n    weekly\n    rotate 4\n    compress\n    missingok\n    notifempty\n    postrotate\n        /usr/bin/systemctl reload rsyslog.service >/dev/null || true\n    endscript\n}",
+    "version_diff": "僅 RHEL 9 有此項（新增項目 0308）；RHEL 8 無對應規則。",
+    "type": "custom",
+    "params": {
+      "dir": "/var/log/rsyslog",
+      "dir_mode": "750",
+      "logrotate_file": "/etc/logrotate.d/rsyslog",
+      "stanza": "/var/log/rsyslog/*.log {\n    weekly\n    rotate 4\n    compress\n    missingok\n    notifempty\n    postrotate\n        /usr/bin/systemctl reload rsyslog.service >/dev/null || true\n    endscript\n}",
+      "directives": [
+        "weekly",
+        "rotate 4",
+        "compress",
+        "missingok",
+        "notifempty",
+        "postrotate",
+        "/usr/bin/systemctl reload rsyslog.service >/dev/null || true",
+        "endscript"
+      ]
+    },
+    "check": "(1) /var/log/rsyslog 存在、為目錄、權限不超出 0750；(2) /etc/logrotate.d/rsyslog 有路徑樣式含 /var/log/rsyslog/*.log 的區塊，區塊內含 weekly、rotate 4、compress、missingok、notifempty 與含 systemctl reload rsyslog 的 postrotate…endscript；可再以 logrotate -d /etc/logrotate.d/rsyslog 確認語法無誤（-d 不會實際輪替）。",
+    "fix": "建立 /var/log/rsyslog（mkdir -p、chmod 750、root:root）；備份 /etc/logrotate.d/rsyslog 後，在檔案末端附加上述區塊（不修改 RHEL 預設的 /var/log/messages 等區塊）；以 logrotate -d 驗證。回滾：還原 /etc/logrotate.d/rsyslog 備份，刪除工具新建且為空的 /var/log/rsyslog。",
+    "risk": "A",
+    "risk_reason": "只新增目錄與輪替設定，不影響現有日誌",
+    "needs_reboot": false,
+    "applies_when": "已安裝 rsyslog 與 logrotate（RHEL 9）",
+    "existing": false,
+    "notes": "RHEL 9 預設 rsyslog 不會寫入 /var/log/rsyslog/，除非另有規則把日誌導到該目錄，此設定實質只確保目錄與輪替規則存在。同一路徑不可出現在兩個 logrotate 區塊，否則 logrotate 會報 duplicate log entry 錯誤，附加前需檢查。RHEL 9 的 /etc/logrotate.d/rsyslog 屬 rsyslog-logrotate 子套件，套件升級可能產生 .rpmnew，不會覆蓋修改。"
+  }
+]

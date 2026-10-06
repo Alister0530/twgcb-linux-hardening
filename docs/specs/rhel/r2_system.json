@@ -1,0 +1,1431 @@
+[
+  {
+    "key": "etc_shadow_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0048",
+      "rhel9": "TWGCB-01-012-0048"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/shadow 檔案權限",
+    "expected": "000",
+    "doc_method": "#chmod 000 /etc/shadow",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/shadow"
+      ],
+      "owner": null,
+      "groups": null,
+      "max_mode": "0000",
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/shadow 的 uid/gid/mode；權限位元不可超出 0000，即 (mode & 0o7777) & ~上限 == 0。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 mode 後執行 chmod 000 /etc/shadow（僅移除多餘位元：new = old & 0o000，避免反而增加權限）（Fx.chmod）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "root 以 CAP_DAC_OVERRIDE 仍可讀寫，RHEL 預設即為 0000，不影響登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": true,
+    "notes": "RHEL 8/9 預設 ----------（0000），通常直接合格。"
+  },
+  {
+    "key": "etc_group_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0049",
+      "rhel9": "TWGCB-01-012-0049"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/group 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "#chown root:root /etc/group",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/group"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/group 的 uid/gid/mode；擁有者須為 root（uid 0），群組須為 root 之一（以 grp.getgrnam 解析名稱，群組不存在則略過該選項）。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 uid/gid 後執行 chown root:root /etc/group（Fx.chown）；回滾：chown 回原 uid:gid。檔案若有 SUID/SGID 位元不受影響（一般檔）。",
+    "risk": "A",
+    "risk_reason": "RHEL 預設即為 root:root，修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "etc_group_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0050",
+      "rhel9": "TWGCB-01-012-0050"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/group 檔案權限",
+    "expected": "644 或更低權限",
+    "doc_method": "#chmod 644 /etc/group",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/group"
+      ],
+      "owner": null,
+      "groups": null,
+      "max_mode": "0644",
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/group 的 uid/gid/mode；權限位元不可超出 0644，即 (mode & 0o7777) & ~上限 == 0。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 mode 後執行 chmod 644 /etc/group（僅移除多餘位元：new = old & 0o644，避免反而增加權限）（Fx.chmod）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "只移除多餘權限位元，一般使用者仍可讀取群組資訊。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "etc_gshadow_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0051",
+      "rhel9": "TWGCB-01-012-0051"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/gshadow 檔案所有權",
+    "expected": "root:root 或 root:shadow",
+    "doc_method": "#chown root:root /etc/gshadow 或 #chown root:shadow /etc/gshadow",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/gshadow"
+      ],
+      "owner": "root",
+      "groups": [
+        "root",
+        "shadow"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/gshadow 的 uid/gid/mode；擁有者須為 root（uid 0），群組須為 root、shadow 之一（以 grp.getgrnam 解析名稱，群組不存在則略過該選項）。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 uid/gid 後執行 chown root:root /etc/gshadow（Fx.chown）；回滾：chown 回原 uid:gid。檔案若有 SUID/SGID 位元不受影響（一般檔）。",
+    "risk": "A",
+    "risk_reason": "RHEL 預設即為 root:root，修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "RHEL 8/9 預設沒有 shadow 群組，/etc/gshadow 預設為 root:root 0000，通常直接合格；檢測時 shadow 群組不存在就只接受 root:root。"
+  },
+  {
+    "key": "etc_gshadow_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0052",
+      "rhel9": "TWGCB-01-012-0052"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/gshadow 檔案權限",
+    "expected": "000",
+    "doc_method": "#chmod 000 /etc/gshadow",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/gshadow"
+      ],
+      "owner": null,
+      "groups": null,
+      "max_mode": "0000",
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/gshadow 的 uid/gid/mode；權限位元不可超出 0000，即 (mode & 0o7777) & ~上限 == 0。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 mode 後執行 chmod 000 /etc/gshadow（僅移除多餘位元：new = old & 0o000，避免反而增加權限）（Fx.chmod）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "root 仍可存取，RHEL 預設即為 0000。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "etc_passwd_bak_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0053",
+      "rhel9": "TWGCB-01-012-0053"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/passwd-檔案所有權",
+    "expected": "root:root",
+    "doc_method": "#chown root:root /etc/passwd-",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/passwd-"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/passwd- 的 uid/gid/mode；擁有者須為 root（uid 0），群組須為 root 之一（以 grp.getgrnam 解析名稱，群組不存在則略過該選項）。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 uid/gid 後執行 chown root:root /etc/passwd-（Fx.chown）；回滾：chown 回原 uid:gid。檔案若有 SUID/SGID 位元不受影響（一般檔）。",
+    "risk": "A",
+    "risk_reason": "備份檔所有權修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "/etc/passwd- 存在",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "etc_passwd_bak_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0054",
+      "rhel9": "TWGCB-01-012-0054"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/passwd-檔案權限",
+    "expected": {
+      "rhel8": "600 或更低權限",
+      "rhel9": "644 或更低權限"
+    },
+    "doc_method": "RHEL 8：#chmod 600 /etc/passwd-；RHEL 9：#chmod 644 /etc/passwd-",
+    "version_diff": "設定值不同：RHEL 8 要求 600 或更低，RHEL 9 放寬為 644 或更低（RHEL 9 說明亦改為「其餘所有使用者僅可讀取」）。",
+    "type": "file_perm",
+    "params": {
+      "rhel8": {
+        "paths": [
+          "/etc/passwd-"
+        ],
+        "owner": null,
+        "groups": null,
+        "max_mode": "0600",
+        "recursive": false
+      },
+      "rhel9": {
+        "paths": [
+          "/etc/passwd-"
+        ],
+        "owner": null,
+        "groups": null,
+        "max_mode": "0644",
+        "recursive": false
+      }
+    },
+    "check": "依作業系統主版本（/etc/os-release 的 VERSION_ID 主版號）選擇上限：RHEL 8 為 0600、RHEL 9 為 0644；以 os.stat 取得 /etc/passwd- 的 uid/gid/mode；權限位元不可超出 0600/0644，即 (mode & 0o7777) & ~上限 == 0。檔案不存在時回傳不適用（NA）。",
+    "fix": "依版本執行 chmod 600 或 644（new = old & 上限）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "只移除備份檔多餘權限位元，不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "/etc/passwd- 存在",
+    "existing": false,
+    "notes": "RHEL 8 預設 /etc/passwd- 為 0644，因此 RHEL 8 預設不合格；且 shadow-utils（useradd/usermod/vipw）每次更新 /etc/passwd 時會依原檔權限重建 passwd-，修復後可能再變回 0644，需定期重新檢測。"
+  },
+  {
+    "key": "etc_shadow_bak_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0055",
+      "rhel9": "TWGCB-01-012-0055"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/shadow-檔案所有權",
+    "expected": "root:root 或 root:shadow",
+    "doc_method": "#chown root:root /etc/shadow- 或 #chown root:shadow /etc/shadow-",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/shadow-"
+      ],
+      "owner": "root",
+      "groups": [
+        "root",
+        "shadow"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/shadow- 的 uid/gid/mode；擁有者須為 root（uid 0），群組須為 root、shadow 之一（以 grp.getgrnam 解析名稱，群組不存在則略過該選項）。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 uid/gid 後執行 chown root:root /etc/shadow-（Fx.chown）；回滾：chown 回原 uid:gid。檔案若有 SUID/SGID 位元不受影響（一般檔）。",
+    "risk": "A",
+    "risk_reason": "備份檔所有權修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "/etc/shadow- 存在",
+    "existing": false,
+    "notes": "RHEL 8/9 預設沒有 shadow 群組，/etc/shadow- 預設為 root:root 0000，通常直接合格；檢測時 shadow 群組不存在就只接受 root:root。"
+  },
+  {
+    "key": "etc_shadow_bak_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0056",
+      "rhel9": "TWGCB-01-012-0056"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/shadow-檔案權限",
+    "expected": "000",
+    "doc_method": "#chmod 000 /etc/shadow-",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。RHEL 8 原文指令為「# chmod」多一空格，無實質差異。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/shadow-"
+      ],
+      "owner": null,
+      "groups": null,
+      "max_mode": "0000",
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/shadow- 的 uid/gid/mode；權限位元不可超出 0000，即 (mode & 0o7777) & ~上限 == 0。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 mode 後執行 chmod 000 /etc/shadow-（僅移除多餘位元：new = old & 0o000，避免反而增加權限）（Fx.chmod）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "僅變更備份檔權限，root 仍可讀寫。",
+    "needs_reboot": false,
+    "applies_when": "/etc/shadow- 存在",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "etc_group_bak_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0057",
+      "rhel9": "TWGCB-01-012-0057"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/group-檔案所有權",
+    "expected": "root:root",
+    "doc_method": "#chown root:root /etc/group-",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/group-"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/group- 的 uid/gid/mode；擁有者須為 root（uid 0），群組須為 root 之一（以 grp.getgrnam 解析名稱，群組不存在則略過該選項）。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 uid/gid 後執行 chown root:root /etc/group-（Fx.chown）；回滾：chown 回原 uid:gid。檔案若有 SUID/SGID 位元不受影響（一般檔）。",
+    "risk": "A",
+    "risk_reason": "備份檔所有權修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "/etc/group- 存在",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "etc_group_bak_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0058",
+      "rhel9": "TWGCB-01-012-0058"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/group-檔案權限",
+    "expected": "644 或更低權限",
+    "doc_method": "#chmod 644 /etc/group-",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/group-"
+      ],
+      "owner": null,
+      "groups": null,
+      "max_mode": "0644",
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/group- 的 uid/gid/mode；權限位元不可超出 0644，即 (mode & 0o7777) & ~上限 == 0。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 mode 後執行 chmod 644 /etc/group-（僅移除多餘位元：new = old & 0o644，避免反而增加權限）（Fx.chmod）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "只移除備份檔多餘權限位元。",
+    "needs_reboot": false,
+    "applies_when": "/etc/group- 存在",
+    "existing": false,
+    "notes": "說明欄寫「僅 root 擁有讀取與寫入權限，其餘所有使用者僅可讀取」，與設定值 644 一致。"
+  },
+  {
+    "key": "etc_gshadow_bak_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0059",
+      "rhel9": "TWGCB-01-012-0059"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/gshadow-檔案所有權",
+    "expected": "root:root 或 root:shadow",
+    "doc_method": "#chown root:root /etc/gshadow- 或 #chown root:shadow /etc/gshadow-",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/gshadow-"
+      ],
+      "owner": "root",
+      "groups": [
+        "root",
+        "shadow"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/gshadow- 的 uid/gid/mode；擁有者須為 root（uid 0），群組須為 root、shadow 之一（以 grp.getgrnam 解析名稱，群組不存在則略過該選項）。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 uid/gid 後執行 chown root:root /etc/gshadow-（Fx.chown）；回滾：chown 回原 uid:gid。檔案若有 SUID/SGID 位元不受影響（一般檔）。",
+    "risk": "A",
+    "risk_reason": "備份檔所有權修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "/etc/gshadow- 存在",
+    "existing": false,
+    "notes": "RHEL 8/9 預設沒有 shadow 群組，/etc/gshadow- 預設為 root:root 0000，通常直接合格；檢測時 shadow 群組不存在就只接受 root:root。"
+  },
+  {
+    "key": "etc_gshadow_bak_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0060",
+      "rhel9": "TWGCB-01-012-0060"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/gshadow-檔案權限",
+    "expected": "000",
+    "doc_method": "#chmod 000 /etc/gshadow-",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/gshadow-"
+      ],
+      "owner": null,
+      "groups": null,
+      "max_mode": "0000",
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/gshadow- 的 uid/gid/mode；權限位元不可超出 0000，即 (mode & 0o7777) & ~上限 == 0。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 mode 後執行 chmod 000 /etc/gshadow-（僅移除多餘位元：new = old & 0o000，避免反而增加權限）（Fx.chmod）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "僅變更備份檔權限，root 仍可讀寫。",
+    "needs_reboot": false,
+    "applies_when": "/etc/gshadow- 存在",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "world_writable_files",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0061",
+      "rhel9": "TWGCB-01-012-0061"
+    },
+    "category": "系統設定與維護",
+    "title": "其他使用者寫入具有全域寫入權限之檔案",
+    "expected": "禁止寫入",
+    "doc_method": "在每個磁區執行 #find (partition) -xdev -type f -perm -0002 找出全域可寫檔案，再以 #chmod o-w (檔案名稱) 移除其他身分寫入權限。",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "掃描本機檔案系統中 other 可寫（-perm -0002）的一般檔案"
+    },
+    "check": "掃描範圍：讀取 /proc/self/mountinfo，取本機檔案系統（xfs、ext2/3/4、btrfs、vfat 等；排除 proc、sysfs、tmpfs、devtmpfs、cgroup、overlay、squashfs、nfs/cifs 等網路與虛擬檔案系統）的每個掛載點，以 os.walk(followlinks=False) 走訪並以 st_dev 比對達成 -xdev 效果（等同文件的 find (partition) -xdev）。對一般檔案（lstat 為 S_ISREG）檢查 mode & 0o002；找到任一即不合格，列出前 N 筆路徑與總數。",
+    "fix": "C 類不自動修復。manual_hint：逐一確認檔案用途後執行 chmod o-w <檔案>。若日後改為自動修復，需先記錄每個檔案原 mode 以便回滾。",
+    "risk": "C",
+    "risk_reason": "全域可寫檔案可能被應用程式刻意共用，需人工判斷用途（與 Ubuntu 版決策一致）。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "大型檔案系統掃描可能耗時，建議設定逾時與筆數上限。RHEL 預設安裝不應有全域可寫一般檔案。"
+  },
+  {
+    "key": "unowned_files",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0062",
+      "rhel9": "TWGCB-01-012-0062"
+    },
+    "category": "系統設定與維護",
+    "title": "檢查所有檔案與目錄之擁有者",
+    "expected": "所有檔案與目錄擁有者皆為合法使用者",
+    "doc_method": "在每個磁區執行 #find (partition) -xdev -nouser，針對結果 #chown (使用者) (檔案) 或 #rm (檔案)。",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "掃描擁有者 UID 不存在於帳號資料庫（-nouser）的檔案與目錄"
+    },
+    "check": "掃描範圍：讀取 /proc/self/mountinfo，取本機檔案系統（xfs、ext2/3/4、btrfs、vfat 等；排除 proc、sysfs、tmpfs、devtmpfs、cgroup、overlay、squashfs、nfs/cifs 等網路與虛擬檔案系統）的每個掛載點，以 os.walk(followlinks=False) 走訪並以 st_dev 比對達成 -xdev 效果（等同文件的 find (partition) -xdev）。預先以 pwd.getpwall() 建立合法 UID 集合（含 sssd/LDAP 時 getpwall 可能不完整，改以 pwd.getpwuid 逐一查詢並快取），lstat 的 st_uid 不在集合中即不合格。",
+    "fix": "C 類不自動修復。manual_hint：確認檔案來源後 chown 給正確使用者或刪除。",
+    "risk": "C",
+    "risk_reason": "需人工判斷檔案用途與應歸屬的使用者，刪除或錯誤指派無法安全自動化。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "容器映像解壓、rpm 安裝後刪除帳號等情況常見；網路帳號（sssd）環境要用 getpwuid 查詢避免誤判。"
+  },
+  {
+    "key": "ungrouped_files",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0063",
+      "rhel9": "TWGCB-01-012-0063"
+    },
+    "category": "系統設定與維護",
+    "title": "檢查所有檔案與目錄之擁有群組",
+    "expected": "所有檔案與目錄擁有群組皆為合法群組",
+    "doc_method": "在每個磁區執行 #find (partition) -xdev -nogroup，針對結果 #chgrp (群組) (檔案) 或 #rm (檔案)。",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "掃描擁有群組 GID 不存在（-nogroup）的檔案與目錄"
+    },
+    "check": "掃描範圍：讀取 /proc/self/mountinfo，取本機檔案系統（xfs、ext2/3/4、btrfs、vfat 等；排除 proc、sysfs、tmpfs、devtmpfs、cgroup、overlay、squashfs、nfs/cifs 等網路與虛擬檔案系統）的每個掛載點，以 os.walk(followlinks=False) 走訪並以 st_dev 比對達成 -xdev 效果（等同文件的 find (partition) -xdev）。以 grp.getgrgid 查詢並快取，查無群組即不合格。",
+    "fix": "C 類不自動修復。manual_hint：確認檔案來源後 chgrp 給正確群組或刪除。",
+    "risk": "C",
+    "risk_reason": "需人工判斷檔案用途與應歸屬的群組，無法安全自動化。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "ww_dir_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0064",
+      "rhel9": "TWGCB-01-012-0064"
+    },
+    "category": "系統設定與維護",
+    "title": "所有具有全域寫入權限目錄之擁有者",
+    "expected": "root 或其他系統帳號",
+    "doc_method": "在每個磁區執行 #find (partition) -xdev -type d -perm -0002 -uid +999 -print，針對結果 #chown root (目錄名稱)。",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "全域可寫目錄的擁有者 UID 須 <= 999",
+      "uid_max": 999
+    },
+    "check": "掃描範圍：讀取 /proc/self/mountinfo，取本機檔案系統（xfs、ext2/3/4、btrfs、vfat 等；排除 proc、sysfs、tmpfs、devtmpfs、cgroup、overlay、squashfs、nfs/cifs 等網路與虛擬檔案系統）的每個掛載點，以 os.walk(followlinks=False) 走訪並以 st_dev 比對達成 -xdev 效果（等同文件的 find (partition) -xdev）。對目錄檢查 mode & 0o002 且 st_uid > 999（find 的 -uid +999 即大於 999）者即不合格。",
+    "fix": "C 類不自動修復。manual_hint：確認目錄用途（常為使用者自建的共享目錄）後 chown root <目錄>，並考慮加上黏滯位。",
+    "risk": "C",
+    "risk_reason": "目錄多為使用者或應用程式自建的共享目錄，改擁有者會影響其管理權，需人工判斷。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "門檻 999 對應 RHEL 的 /etc/login.defs SYS_UID_MAX=999；也可改讀 login.defs 的 UID_MIN-1。"
+  },
+  {
+    "key": "ww_dir_group",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0065",
+      "rhel9": "TWGCB-01-012-0065"
+    },
+    "category": "系統設定與維護",
+    "title": "所有具有全域寫入權限目錄之擁有群組",
+    "expected": "root 或其他系統群組",
+    "doc_method": "在每個磁區執行 #find (partition) -xdev -type d -perm -0002 -gid +999 -print，針對結果 #chgrp root (目錄名稱)。",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "全域可寫目錄的擁有群組 GID 須 <= 999",
+      "gid_max": 999
+    },
+    "check": "掃描範圍：讀取 /proc/self/mountinfo，取本機檔案系統（xfs、ext2/3/4、btrfs、vfat 等；排除 proc、sysfs、tmpfs、devtmpfs、cgroup、overlay、squashfs、nfs/cifs 等網路與虛擬檔案系統）的每個掛載點，以 os.walk(followlinks=False) 走訪並以 st_dev 比對達成 -xdev 效果（等同文件的 find (partition) -xdev）。對目錄檢查 mode & 0o002 且 st_gid > 999 者即不合格。",
+    "fix": "C 類不自動修復。manual_hint：確認用途後 chgrp root <目錄>（或其他系統/應用程式群組）。",
+    "risk": "C",
+    "risk_reason": "群組可能是應用程式刻意指定的共用群組，需人工判斷。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "sys_cmd_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0066",
+      "rhel9": "TWGCB-01-012-0066"
+    },
+    "category": "系統設定與維護",
+    "title": "系統命令檔案權限",
+    "expected": "755 或更低權限",
+    "doc_method": "#find -L /bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin -perm /0022 -exec ls -l {} \\; 找出權限高於 755 者，再 #chmod 755 (系統命令檔案名稱)。",
+    "version_diff": "RHEL 8 原文 -exec ls -l {}\\; 少了空白（find 會報錯 missing argument），RHEL 9 已修正為 {} \\;；其餘兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "系統命令目錄中 group/other 可寫的項目",
+      "dirs": [
+        "/bin",
+        "/sbin",
+        "/usr/bin",
+        "/usr/sbin",
+        "/usr/local/bin",
+        "/usr/local/sbin"
+      ],
+      "bad_bits": "0022"
+    },
+    "check": "走訪 /bin、/sbin、/usr/bin、/usr/sbin、/usr/local/bin、/usr/local/sbin：RHEL 8/9 的 /bin、/sbin、/lib、/lib64 是指向 /usr 的符號連結，先以 os.path.realpath 去重；文件使用 find -L（跟隨符號連結），實作以 os.walk(followlinks=False) 走訪並對每個項目用 os.stat（跟隨連結，取得目標屬性）判斷，壞掉的連結略過，避免連結迴圈。目標 mode & 0o022 != 0 即不合格（文件未加 -type f，目錄本身也列入；符號連結以目標為準）。",
+    "fix": "對每個不合格目標記錄原 mode，執行 chmod go-w（new = old & ~0o022），不要照文件 chmod 755，以免移除 SUID/SGID/黏滯位或反而增加權限；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "只移除 group/other 寫入位元，不影響執行；系統命令正常不應可被他人寫入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件寫 chmod 755 會清除 setuid/setgid（如 /usr/bin/passwd、sudo），實作必須用 go-w。RHEL 預設安裝應全部合格；若 /usr/local 下有應用程式自行安裝的檔案才可能不合格。"
+  },
+  {
+    "key": "sys_cmd_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0067",
+      "rhel9": "TWGCB-01-012-0067"
+    },
+    "category": "系統設定與維護",
+    "title": "系統命令檔案擁有者",
+    "expected": "root",
+    "doc_method": "#find -L /bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin ! -user root -exec ls -l {} \\; 找出擁有者非 root 者，再 #chown root (系統命令檔案名稱)。",
+    "version_diff": "RHEL 8 原文 -exec ls -l {}\\; 少了空白（find 會報錯 missing argument），RHEL 9 已修正為 {} \\;；其餘兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "系統命令目錄中擁有者非 root 的項目",
+      "dirs": [
+        "/bin",
+        "/sbin",
+        "/usr/bin",
+        "/usr/sbin",
+        "/usr/local/bin",
+        "/usr/local/sbin"
+      ]
+    },
+    "check": "走訪 /bin、/sbin、/usr/bin、/usr/sbin、/usr/local/bin、/usr/local/sbin：RHEL 8/9 的 /bin、/sbin、/lib、/lib64 是指向 /usr 的符號連結，先以 os.path.realpath 去重；文件使用 find -L（跟隨符號連結），實作以 os.walk(followlinks=False) 走訪並對每個項目用 os.stat（跟隨連結，取得目標屬性）判斷，壞掉的連結略過，避免連結迴圈。目標 st_uid != 0 即不合格。",
+    "fix": "記錄原 uid 與 mode，執行 os.chown(path, 0, -1)；chown 會由核心清除 SUID/SGID 位元，因此 chown 後要以原 mode 再 chmod 一次；回滾：chown 回原 uid 並還原 mode。屬於 RPM 套件的檔案先以 rpm -qf 確認，若套件中原本就不是 root 擁有則改列人工處理。",
+    "risk": "B",
+    "risk_reason": "/usr/local 下多為應用程式自行安裝的檔案，改擁有者可能影響該應用程式更新或執行。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "RHEL 預設安裝應全部合格。"
+  },
+  {
+    "key": "sys_cmd_group",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0068",
+      "rhel9": "TWGCB-01-012-0068"
+    },
+    "category": "系統設定與維護",
+    "title": "系統命令檔案擁有群組",
+    "expected": "root",
+    "doc_method": "#find -L /bin /sbin /usr/bin /usr/sbin /usr/local/bin /usr/local/sbin ! -group root ! -group tty ! -group slocate ! -group lock -exec ls -l {} \\; 找出擁有群組非 root 者，再 #chgrp root (系統命令檔案名稱)。",
+    "version_diff": "RHEL 8 原文 -exec ls -l {}\\; 少了空白（find 會報錯 missing argument），RHEL 9 已修正為 {} \\;；其餘兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "系統命令目錄中擁有群組不在允許清單的項目",
+      "dirs": [
+        "/bin",
+        "/sbin",
+        "/usr/bin",
+        "/usr/sbin",
+        "/usr/local/bin",
+        "/usr/local/sbin"
+      ],
+      "allowed_groups": [
+        "root",
+        "tty",
+        "slocate",
+        "lock"
+      ]
+    },
+    "check": "走訪 /bin、/sbin、/usr/bin、/usr/sbin、/usr/local/bin、/usr/local/sbin：RHEL 8/9 的 /bin、/sbin、/lib、/lib64 是指向 /usr 的符號連結，先以 os.path.realpath 去重；文件使用 find -L（跟隨符號連結），實作以 os.walk(followlinks=False) 走訪並對每個項目用 os.stat（跟隨連結，取得目標屬性）判斷，壞掉的連結略過，避免連結迴圈。目標群組名稱（grp.getgrgid）不在 root、tty、slocate、lock 之一即不合格。",
+    "fix": "C 類不自動修復。manual_hint：逐一確認，若檔案屬於 RPM 且套件本來就設定該群組（rpm -qf 與 rpm -V 無異常），改群組會破壞功能，應保留並記錄例外。",
+    "risk": "C",
+    "risk_reason": "部分 RHEL 套件的 SGID 程式本來就使用專屬群組，改為 root 會破壞功能，需人工判斷。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "已知例外：postfix 的 /usr/sbin/postdrop、/usr/sbin/postqueue（root:postdrop 2755）、systemtap-runtime 的 /usr/bin/staprun（root:stapusr）等；依文件字面會判定不合格，請在報告中提示。chgrp 也會清除 SUID/SGID，若人工修正需注意。"
+  },
+  {
+    "key": "lib_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0069",
+      "rhel9": "TWGCB-01-012-0069"
+    },
+    "category": "系統設定與維護",
+    "title": "程式庫檔案權限",
+    "expected": "755 或更低權限",
+    "doc_method": "#find -L /lib /lib64 /usr/lib /usr/lib64 -perm /0022 -type f -exec ls -l {} \\; 找出權限高於 755 者，再 #chmod 755 (程式庫檔案名稱)。",
+    "version_diff": "RHEL 8 原文 -exec ls -l {}\\; 少了空白（find 會報錯 missing argument），RHEL 9 已修正為 {} \\;；其餘兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "程式庫目錄中 group/other 可寫的一般檔案",
+      "dirs": [
+        "/lib",
+        "/lib64",
+        "/usr/lib",
+        "/usr/lib64"
+      ],
+      "bad_bits": "0022"
+    },
+    "check": "走訪 /lib、/lib64、/usr/lib、/usr/lib64：RHEL 8/9 的 /bin、/sbin、/lib、/lib64 是指向 /usr 的符號連結，先以 os.path.realpath 去重；文件使用 find -L（跟隨符號連結），實作以 os.walk(followlinks=False) 走訪並對每個項目用 os.stat（跟隨連結，取得目標屬性）判斷，壞掉的連結略過，避免連結迴圈。只看一般檔案（-type f），目標 mode & 0o022 != 0 即不合格。",
+    "fix": "記錄原 mode，執行 chmod go-w（不要 chmod 755，以免清除特殊位元或替 .so 以外的檔案加上執行權限）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "只移除 group/other 寫入位元，不影響程式庫載入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "/usr/lib 內檔案量大（數十萬），掃描需數十秒，建議設定逾時。"
+  },
+  {
+    "key": "lib_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0070",
+      "rhel9": "TWGCB-01-012-0070"
+    },
+    "category": "系統設定與維護",
+    "title": "程式庫檔案擁有者",
+    "expected": "root",
+    "doc_method": "#find -L /lib /lib64 /usr/lib /usr/lib64 ! -user root -exec ls -l {} \\; 找出擁有者非 root 者，再 #chown root (程式庫檔案名稱)。",
+    "version_diff": "RHEL 8 原文 -exec ls -l {}\\; 少了空白（find 會報錯 missing argument），RHEL 9 已修正為 {} \\;；其餘兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "程式庫目錄中擁有者非 root 的項目",
+      "dirs": [
+        "/lib",
+        "/lib64",
+        "/usr/lib",
+        "/usr/lib64"
+      ]
+    },
+    "check": "走訪 /lib、/lib64、/usr/lib、/usr/lib64：RHEL 8/9 的 /bin、/sbin、/lib、/lib64 是指向 /usr 的符號連結，先以 os.path.realpath 去重；文件使用 find -L（跟隨符號連結），實作以 os.walk(followlinks=False) 走訪並對每個項目用 os.stat（跟隨連結，取得目標屬性）判斷，壞掉的連結略過，避免連結迴圈。目標 st_uid != 0 即不合格（文件未加 -type f，目錄也列入）。",
+    "fix": "記錄原 uid 與 mode 後 chown root 並還原 mode（chown 會清 SUID/SGID）；回滾：chown 回原 uid。RPM 擁有且套件本來就非 root 的項目改列人工處理。",
+    "risk": "B",
+    "risk_reason": "部分應用程式在 /usr/lib 下有以服務帳號擁有的目錄，改擁有者可能影響其運作。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "RHEL 預設安裝通常合格；第三方軟體（如安裝在 /usr/lib 的應用程式）可能不合格。"
+  },
+  {
+    "key": "lib_group",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0071",
+      "rhel9": "TWGCB-01-012-0071"
+    },
+    "category": "系統設定與維護",
+    "title": "程式庫檔案擁有群組",
+    "expected": "root",
+    "doc_method": "#find -L /lib /lib64 /usr/lib /usr/lib64 ! -group root -exec ls -l {} \\; 找出擁有群組非 root 者，再 #chgrp root (程式庫檔案名稱)。",
+    "version_diff": "RHEL 8 原文 -exec ls -l {}\\; 少了空白（find 會報錯 missing argument），RHEL 9 已修正為 {} \\;；其餘兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "程式庫目錄中擁有群組非 root 的項目",
+      "dirs": [
+        "/lib",
+        "/lib64",
+        "/usr/lib",
+        "/usr/lib64"
+      ]
+    },
+    "check": "走訪 /lib、/lib64、/usr/lib、/usr/lib64：RHEL 8/9 的 /bin、/sbin、/lib、/lib64 是指向 /usr 的符號連結，先以 os.path.realpath 去重；文件使用 find -L（跟隨符號連結），實作以 os.walk(followlinks=False) 走訪並對每個項目用 os.stat（跟隨連結，取得目標屬性）判斷，壞掉的連結略過，避免連結迴圈。目標 st_gid != 0 即不合格。",
+    "fix": "記錄原 gid 與 mode 後 chgrp root 並還原 mode；回滾：chgrp 回原 gid。RPM 擁有且套件本來就非 root 群組的項目改列人工處理。",
+    "risk": "B",
+    "risk_reason": "部分套件的目錄本來就使用專屬群組（例如 /usr/lib 下的服務目錄），改群組可能影響功能。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "empty_password",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0072",
+      "rhel9": "TWGCB-01-012-0072"
+    },
+    "category": "系統設定與維護",
+    "title": "帳號不使用空白通行碼",
+    "expected": "帳號必須具有通行碼或被鎖定",
+    "doc_method": "#awk -F: '($2 == \"\" ) { print $1 \" does not have a password \"}' /etc/shadow 列出空白密碼帳號，再 #passwd (帳號名稱) 設定密碼，或 #passwd -l (帳號名稱) 鎖定帳號。",
+    "version_diff": "RHEL 9 標題為「帳號不使用空白通行碼」、設定值「帳號必須具有通行碼或被鎖定」；內容相同。",
+    "type": "custom",
+    "params": {
+      "desc": "/etc/shadow 第 2 欄為空字串的帳號"
+    },
+    "check": "讀取 /etc/shadow，第 2 欄為空字串（不是 !、!!、* 等鎖定標記）的帳號即不合格。",
+    "fix": "對每個帳號執行 passwd -l <帳號>（在密碼欄前加 !，帳號無法以密碼登入）；修復前備份 /etc/shadow。回滾：還原該帳號的 shadow 原始行（不能用 passwd -u，因為 passwd 會拒絕解鎖成空白密碼）。",
+    "risk": "B",
+    "risk_reason": "鎖定帳號會使該帳號無法以密碼登入，可能影響正在使用的人員或服務。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": true,
+    "notes": "已實作。依文件也可設定密碼，但需人工輸入，自動修復只採鎖定。標題以 RHEL 9 為準時為「帳號不使用空白通行碼」。"
+  },
+  {
+    "key": "root_path_sane",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0073",
+      "rhel9": "TWGCB-01-012-0073"
+    },
+    "category": "系統設定與維護",
+    "title": "root 帳號之路徑變數",
+    "expected": "不允許「.」、「..」、路徑開頭不是「/」及空元素",
+    "doc_method": "#echo $PATH 顯示 PATH，如出現「.」、「..」、路徑開頭不是「/」及空元素，編輯 /etc/profile 修改。",
+    "version_diff": "RHEL 9 標題為「root 帳號之路徑變數」；內容相同。",
+    "type": "custom",
+    "params": {
+      "desc": "root PATH 不含 . / .. / 相對路徑 / 空元素"
+    },
+    "check": "取得 root 登入環境的 PATH：執行 `su - root -c 'printf %s \"$PATH\"'`（模擬 root 登入 shell，會載入 /etc/profile、/root/.bash_profile、/root/.bashrc），不要直接用工具行程本身的 PATH（經 sudo 執行時會被 secure_path 取代）。以 ':' 切割：出現空元素（開頭或結尾為 ':' 或含 '::'）、元素為 '.' 或 '..'、或元素不以 '/' 開頭即不合格。",
+    "fix": "C 類不自動修復。manual_hint：PATH 可能來自 /etc/profile、/etc/profile.d/*.sh、/root/.bash_profile、/root/.bashrc，請找出加入不當元素的位置後手動修正。",
+    "risk": "C",
+    "risk_reason": "PATH 由多個 shell 啟動檔組合，需人工判斷來源，自動改寫可能破壞 root 環境。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件只提到 /etc/profile，但 RHEL 上 root 的 PATH 也常由 /root/.bash_profile 加入 $HOME/bin 等。"
+  },
+  {
+    "key": "root_path_no_writable",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0074",
+      "rhel9": "TWGCB-01-012-0074"
+    },
+    "category": "系統設定與維護",
+    "title": "root 帳號之路徑變數不包含 world-writable 或 group-writable 目錄",
+    "expected": "不包含 world-writable 或 group-writable 目錄",
+    "doc_method": "#echo $PATH 顯示 PATH，如出現 world-writable 或 group-writable 目錄，編輯 /etc/profile 修改，或 #chmod o-w (目錄名稱)、#chmod g-w (目錄名稱)。",
+    "version_diff": "RHEL 9 標題為「root 帳號之路徑變數不包含 world-writable 或 group-writable 目錄」（的→之）；內容相同。",
+    "type": "custom",
+    "params": {
+      "desc": "root PATH 中每個存在的目錄 mode & 0o022 == 0"
+    },
+    "check": "取得 root 登入環境的 PATH：執行 `su - root -c 'printf %s \"$PATH\"'`（模擬 root 登入 shell，會載入 /etc/profile、/root/.bash_profile、/root/.bashrc），不要直接用工具行程本身的 PATH（經 sudo 執行時會被 secure_path 取代）。對每個絕對路徑元素以 os.stat（跟隨連結）取得目錄屬性，mode & 0o022 != 0 即不合格；不存在的目錄略過並在 current 註明。",
+    "fix": "對不合格目錄記錄原 mode 後執行 chmod go-w（Fx.chmod）；回滾：chmod 回原 mode。若目錄為 /tmp 之類刻意全域可寫的目錄，不修改權限而改列人工處理（應從 PATH 移除）。",
+    "risk": "B",
+    "risk_reason": "目錄可能為多人共用的工具目錄，移除群組寫入可能影響其他管理者部署程式。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "RHEL 預設 root PATH（/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin）皆合格；/root/bin 預設不存在。"
+  },
+  {
+    "key": "passwd_no_plus",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0075",
+      "rhel9": "TWGCB-01-012-0075"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/passwd 檔案行首之「+」符號",
+    "expected": "禁止",
+    "doc_method": "#grep '^\\+:' /etc/passwd 確認是否存在，如有則編輯 /etc/passwd 移除行首為「+」的列。",
+    "version_diff": "RHEL 9 標題為「/etc/passwd 檔案行首之「+」符號」；內容相同。",
+    "type": "custom",
+    "params": {
+      "desc": "檔案中不得有以 + 開頭的行",
+      "path": "/etc/passwd"
+    },
+    "check": "逐行讀取 /etc/passwd，行首為「+」即不合格（比文件 grep '^\\+:' 嚴格：文件只抓「+:」，NIS compat 也可能寫成「+帳號」或「+@netgroup」，建議一併視為不合格）。",
+    "fix": "備份 /etc/passwd 後以 Fx.edit_file 刪除行首為「+」的行（保留原權限與 SELinux context）；回滾：還原備份。修復前確認 /etc/nsswitch.conf 的 passwd/group/shadow 未使用 compat，若使用 compat 則改列人工處理。",
+    "risk": "A",
+    "risk_reason": "RHEL 8/9 nsswitch 預設為 files sss，不使用 NIS compat 語法，刪除這些行不影響登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "RHEL 預設不存在此類行，通常直接合格。"
+  },
+  {
+    "key": "shadow_no_plus",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0076",
+      "rhel9": "TWGCB-01-012-0076"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/shadow 檔案行首之「+」符號",
+    "expected": "禁止",
+    "doc_method": "#grep '^\\+:' /etc/shadow 確認是否存在，如有則編輯 /etc/shadow 移除行首為「+」的列。",
+    "version_diff": "RHEL 9 標題為「/etc/shadow 檔案行首之「+」符號」；內容相同。",
+    "type": "custom",
+    "params": {
+      "desc": "檔案中不得有以 + 開頭的行",
+      "path": "/etc/shadow"
+    },
+    "check": "逐行讀取 /etc/shadow，行首為「+」即不合格（比文件 grep '^\\+:' 嚴格：文件只抓「+:」，NIS compat 也可能寫成「+帳號」或「+@netgroup」，建議一併視為不合格）。",
+    "fix": "備份 /etc/shadow 後以 Fx.edit_file 刪除行首為「+」的行（保留原權限與 SELinux context）；回滾：還原備份。修復前確認 /etc/nsswitch.conf 的 passwd/group/shadow 未使用 compat，若使用 compat 則改列人工處理。",
+    "risk": "A",
+    "risk_reason": "RHEL 8/9 nsswitch 預設為 files sss，不使用 NIS compat 語法，刪除這些行不影響登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "RHEL 預設不存在此類行，通常直接合格。"
+  },
+  {
+    "key": "group_no_plus",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0077",
+      "rhel9": "TWGCB-01-012-0077"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/group 檔案行首之「+」符號",
+    "expected": "禁止",
+    "doc_method": "#grep '^\\+:' /etc/group 確認是否存在，如有則編輯 /etc/group 移除行首為「+」的列。",
+    "version_diff": "RHEL 9 標題為「/etc/group 檔案行首之「+」符號」；內容相同。",
+    "type": "custom",
+    "params": {
+      "desc": "檔案中不得有以 + 開頭的行",
+      "path": "/etc/group"
+    },
+    "check": "逐行讀取 /etc/group，行首為「+」即不合格（比文件 grep '^\\+:' 嚴格：文件只抓「+:」，NIS compat 也可能寫成「+帳號」或「+@netgroup」，建議一併視為不合格）。",
+    "fix": "備份 /etc/group 後以 Fx.edit_file 刪除行首為「+」的行（保留原權限與 SELinux context）；回滾：還原備份。修復前確認 /etc/nsswitch.conf 的 passwd/group/shadow 未使用 compat，若使用 compat 則改列人工處理。",
+    "risk": "A",
+    "risk_reason": "RHEL 8/9 nsswitch 預設為 files sss，不使用 NIS compat 語法，刪除這些行不影響登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "RHEL 預設不存在此類行，通常直接合格。"
+  },
+  {
+    "key": "uid0_only_root",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0078",
+      "rhel9": "TWGCB-01-012-0078"
+    },
+    "category": "系統設定與維護",
+    "title": "UID=0 之帳號",
+    "expected": "僅 root 帳號之 UID 為 0",
+    "doc_method": "#awk -F: '($3 == 0) { print $1 }' /etc/passwd 列出 UID=0 帳號，若存在非 root 帳號則 #userdel (帳號名稱) 或 #usermod -u (UID) (帳號名稱)。",
+    "version_diff": "兩版內容相同。",
+    "type": "custom",
+    "params": {
+      "desc": "/etc/passwd 中 UID 為 0 的帳號只有 root"
+    },
+    "check": "解析 /etc/passwd，第 3 欄為 0 的帳號除 root 外存在任一即不合格。",
+    "fix": "C 類不自動修復。manual_hint：確認帳號用途後以 userdel 刪除或 usermod -u 改為唯一 UID，並調整其檔案擁有權。",
+    "risk": "C",
+    "risk_reason": "需人工判斷帳號用途，刪除帳號或改 UID 會影響檔案擁有權與登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "home_dir_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0079",
+      "rhel9": "TWGCB-01-012-0079"
+    },
+    "category": "系統設定與維護",
+    "title": "使用者家目錄權限",
+    "expected": "700 或更低權限",
+    "doc_method": "執行文件腳本逐一檢查家目錄權限位元（群組 r/w/x、其他 r/w/x 任一被設定即列出），不合格者 #chmod 700 /home/(使用者帳號名稱)。注意：請先通知使用者。",
+    "version_diff": "RHEL 9 文字用語調整（的→之）；腳本與設定值相同。",
+    "type": "custom",
+    "params": {
+      "desc": "互動帳號家目錄 mode & 0o077 == 0",
+      "max_mode": "0700"
+    },
+    "check": "取得檢查對象：解析 /etc/passwd，排除帳號名稱為 halt、sync、shutdown 者，以及登入 shell 為 /sbin/nologin、/bin/false 者（實作建議一併排除 /usr/sbin/nologin、/usr/bin/false，RHEL 9 部分系統帳號使用 /usr/sbin/nologin，文件腳本會誤列）。家目錄存在時以 os.stat 取得 mode，mode & 0o077 != 0 即不合格（與文件腳本檢查 ls -ld 第 5–10 字元一致）；家目錄不存在只在 current 註明，不判為不合格（由其他規則處理）。",
+    "fix": "記錄原 mode，執行 chmod go-rwx（new = old & ~0o077，保留擁有者位元），不照文件 chmod 700，避免改變 /root 這類 0550 目錄的擁有者位元；家目錄為 /、/var、/usr 等系統目錄時跳過並改列人工處理；回滾：chmod 回原 mode。",
+    "risk": "B",
+    "risk_reason": "可回滾，但會影響依賴群組或他人讀取家目錄的服務（如 ~/public_html、共享目錄），文件亦要求先通知使用者。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "說明欄寫「群組不具寫入(g-w)、其他不具 rwx」（相當於 750），但設定值與腳本為 700，以設定值 700 為準。RHEL 的 /root 預設為 0550（dr-xr-x---），依此規則會判定不合格。useradd 在 RHEL 8/9 預設 HOME_MODE 0700，一般使用者通常合格。"
+  },
+  {
+    "key": "home_dir_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0080",
+      "rhel9": "TWGCB-01-012-0080"
+    },
+    "category": "系統設定與維護",
+    "title": "使用者家目錄擁有者",
+    "expected": "使用者擁有",
+    "doc_method": "執行文件腳本以 stat -L -c \"%U\" 比對家目錄擁有者與帳號名稱，不合格者 #chown (使用者帳號名稱) /home/(使用者帳號名稱)。注意：請先通知使用者。",
+    "version_diff": "RHEL 9 文字用語調整（的→之）；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "家目錄 st_uid 等於帳號 UID"
+    },
+    "check": "取得檢查對象：解析 /etc/passwd，排除帳號名稱為 halt、sync、shutdown 者，以及登入 shell 為 /sbin/nologin、/bin/false 者（實作建議一併排除 /usr/sbin/nologin、/usr/bin/false，RHEL 9 部分系統帳號使用 /usr/sbin/nologin，文件腳本會誤列）。以 os.stat（跟隨連結）取得家目錄 st_uid，與 /etc/passwd 中該帳號 UID 不同即不合格（以 UID 比對，避免多個帳號同 UID 時名稱比對誤判）。",
+    "fix": "C 類不自動修復。manual_hint：確認家目錄非共用或系統目錄後執行 chown <帳號> <家目錄>（使用 passwd 中的實際家目錄路徑，不一定是 /home/帳號）。",
+    "risk": "C",
+    "risk_reason": "家目錄可能是多帳號共用或系統目錄（例如 /），錯誤變更擁有者可能破壞服務。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件修復指令假設家目錄為 /home/(帳號)，實際應以 /etc/passwd 第 6 欄為準。"
+  },
+  {
+    "key": "home_dir_group",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0081",
+      "rhel9": "TWGCB-01-012-0081"
+    },
+    "category": "系統設定與維護",
+    "title": "使用者家目錄擁有群組",
+    "expected": "使用者群組擁有",
+    "doc_method": "執行文件腳本以 stat -L -c \"%g\" 比對家目錄群組 GID 與 /etc/passwd 中帳號的主要 GID，不合格者 #chgrp (使用者群組名稱或 GID) /home/(使用者帳號名稱)。",
+    "version_diff": "RHEL 9 文字用語調整（的→之）；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "家目錄 st_gid 等於帳號主要 GID"
+    },
+    "check": "取得檢查對象：解析 /etc/passwd，排除帳號名稱為 halt、sync、shutdown 者，以及登入 shell 為 /sbin/nologin、/bin/false 者（實作建議一併排除 /usr/sbin/nologin、/usr/bin/false，RHEL 9 部分系統帳號使用 /usr/sbin/nologin，文件腳本會誤列）。以 os.stat 取得家目錄 st_gid，與 /etc/passwd 第 4 欄 GID 不同即不合格。",
+    "fix": "C 類不自動修復。manual_hint：確認家目錄群組是否為刻意設定的共用群組後，執行 chgrp <主要群組> <家目錄>。",
+    "risk": "C",
+    "risk_reason": "家目錄可能刻意設為共用群組或為系統目錄，需人工判斷。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "home_dot_files_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0082",
+      "rhel9": "TWGCB-01-012-0082"
+    },
+    "category": "系統設定與維護",
+    "title": "使用者家目錄之「.」檔案權限",
+    "expected": "go-w 或更低權限",
+    "doc_method": "執行文件腳本檢查每個家目錄下 .[A-Za-z0-9]* 一般檔案（非符號連結）的群組寫入與其他寫入位元，不合格者 #chmod go-w (檔案名稱)。",
+    "version_diff": "RHEL 9 標題為「使用者家目錄之「.」檔案權限」；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "家目錄第一層 . 開頭一般檔案 mode & 0o022 == 0",
+      "glob": ".[A-Za-z0-9]*"
+    },
+    "check": "取得檢查對象：解析 /etc/passwd，排除帳號名稱為 halt、sync、shutdown 者，以及登入 shell 為 /sbin/nologin、/bin/false 者（實作建議一併排除 /usr/sbin/nologin、/usr/bin/false，RHEL 9 部分系統帳號使用 /usr/sbin/nologin，文件腳本會誤列）。對每個家目錄以 glob 取第一層符合 .[A-Za-z0-9]* 的項目，僅檢查非符號連結的一般檔案（os.lstat），mode & 0o022 != 0 即不合格。",
+    "fix": "對每個不合格檔案記錄原 mode 後 chmod go-w；家目錄為 / 等系統目錄時跳過；回滾：chmod 回原 mode。",
+    "risk": "B",
+    "risk_reason": "可回滾且通常無害，但變更的是使用者個人檔案，文件要求先通知使用者。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "home_forward",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0083",
+      "rhel9": "TWGCB-01-012-0083"
+    },
+    "category": "系統設定與維護",
+    "title": "使用者家目錄之「.forward」檔案",
+    "expected": "移除",
+    "doc_method": "執行文件腳本檢查每個家目錄（排除 root）是否存在非符號連結的 .forward 一般檔案，存在則 #rm (檔案名稱)。注意：請先通知使用者。",
+    "version_diff": "RHEL 9 標題為「使用者家目錄之「.forward」檔案」；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "家目錄不得有 .forward 一般檔案",
+      "filename": ".forward"
+    },
+    "check": "取得檢查對象：解析 /etc/passwd，排除帳號名稱為 root、halt、sync、shutdown 者，以及登入 shell 為 /sbin/nologin、/bin/false 者（實作建議一併排除 /usr/sbin/nologin、/usr/bin/false，RHEL 9 部分系統帳號使用 /usr/sbin/nologin，文件腳本會誤列）。檢查 <家目錄>/.forward：os.lstat 為一般檔案（非符號連結）即不合格（與文件 [ ! -h ] && [ -f ] 一致）。",
+    "fix": "C 類不自動修復。manual_hint：通知使用者後移除 .forward（建議先移到備份位置而非直接刪除）。",
+    "risk": "C",
+    "risk_reason": "屬刪除使用者資料，會中斷使用者郵件轉寄，需先通知使用者並人工確認。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件腳本排除 root 帳號，因此 /root/.forward 不在檢查範圍；實作照文件但可在 current 額外提示。"
+  },
+  {
+    "key": "home_netrc",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0084",
+      "rhel9": "TWGCB-01-012-0084"
+    },
+    "category": "系統設定與維護",
+    "title": "使用者家目錄之「.netrc」檔案",
+    "expected": "移除",
+    "doc_method": "執行文件腳本檢查每個家目錄（排除 root）是否存在非符號連結的 .netrc 一般檔案，存在則 #rm (檔案名稱)。注意：請先通知使用者。",
+    "version_diff": "RHEL 9 標題為「使用者家目錄之「.netrc」檔案」；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "家目錄不得有 .netrc 一般檔案",
+      "filename": ".netrc"
+    },
+    "check": "取得檢查對象：解析 /etc/passwd，排除帳號名稱為 root、halt、sync、shutdown 者，以及登入 shell 為 /sbin/nologin、/bin/false 者（實作建議一併排除 /usr/sbin/nologin、/usr/bin/false，RHEL 9 部分系統帳號使用 /usr/sbin/nologin，文件腳本會誤列）。檢查 <家目錄>/.netrc：os.lstat 為一般檔案（非符號連結）即不合格（與文件 [ ! -h ] && [ -f ] 一致）。",
+    "fix": "C 類不自動修復。manual_hint：通知使用者後移除 .netrc（建議先移到備份位置而非直接刪除）。",
+    "risk": "C",
+    "risk_reason": "屬刪除使用者資料，可能中斷使用者的自動化 FTP/curl 作業，需先通知使用者並人工確認。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件腳本排除 root 帳號，因此 /root/.netrc 不在檢查範圍；實作照文件但可在 current 額外提示。"
+  },
+  {
+    "key": "home_rhosts",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0085",
+      "rhel9": "TWGCB-01-012-0085"
+    },
+    "category": "系統設定與維護",
+    "title": "使用者家目錄之「.rhosts」檔案",
+    "expected": "移除",
+    "doc_method": "執行文件腳本檢查每個家目錄（排除 root）是否存在非符號連結的 .rhosts 一般檔案，存在則 #rm (檔案名稱)。注意：請先通知使用者。",
+    "version_diff": "RHEL 9 標題為「使用者家目錄之「.rhosts」檔案」；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "家目錄不得有 .rhosts 一般檔案",
+      "filename": ".rhosts"
+    },
+    "check": "取得檢查對象：解析 /etc/passwd，排除帳號名稱為 root、halt、sync、shutdown 者，以及登入 shell 為 /sbin/nologin、/bin/false 者（實作建議一併排除 /usr/sbin/nologin、/usr/bin/false，RHEL 9 部分系統帳號使用 /usr/sbin/nologin，文件腳本會誤列）。檢查 <家目錄>/.rhosts：os.lstat 為一般檔案（非符號連結）即不合格（與文件 [ ! -h ] && [ -f ] 一致）。",
+    "fix": "C 類不自動修復。manual_hint：通知使用者後移除 .rhosts（建議先移到備份位置而非直接刪除）。",
+    "risk": "C",
+    "risk_reason": "屬刪除使用者資料，可能中斷依賴 rsh 信任關係的作業，需先通知使用者並人工確認。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件腳本排除 root 帳號，因此 /root/.rhosts 不在檢查範圍；實作照文件但可在 current 額外提示。"
+  },
+  {
+    "key": "passwd_groups_exist",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0086",
+      "rhel9": "TWGCB-01-012-0086"
+    },
+    "category": "系統設定與維護",
+    "title": "檢查 /etc/passwd 檔案設定之群組",
+    "expected": "/etc/passwd 檔案中帳號的群組皆須存在於 /etc/group 檔案中",
+    "doc_method": "執行文件腳本，對 /etc/passwd 第 4 欄每個 GID 以 grep -q -P \"^.*?:[^:]*:$i:\" /etc/group 確認存在，不存在者 #usermod -g (群組名稱或 GID) (帳號名稱)。",
+    "version_diff": "RHEL 9 標題為「檢查 /etc/passwd 檔案設定之群組」；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "passwd 主要 GID 皆存在於 /etc/group"
+    },
+    "check": "解析 /etc/passwd 第 4 欄 GID 集合與 /etc/group 第 3 欄 GID 集合，前者有不在後者中的即不合格，列出帳號與 GID。只比對本機檔案（與文件一致）。",
+    "fix": "C 類不自動修復。manual_hint：確認帳號應屬哪個群組，以 groupadd 建立缺少的群組或 usermod -g 修改主要群組。",
+    "risk": "C",
+    "risk_reason": "需人工判斷帳號應屬哪個群組，變更主要群組會影響檔案擁有權。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "unique_uid",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0087",
+      "rhel9": "TWGCB-01-012-0087"
+    },
+    "category": "系統設定與維護",
+    "title": "唯一之 UID",
+    "expected": "為每個帳號設定唯一之 UID",
+    "doc_method": "執行文件腳本（cut -f3 -d\":\" /etc/passwd | sort -n | uniq -c）找出重複 UID，以 #usermod -u (UID) (帳號名稱) 修正。",
+    "version_diff": "RHEL 9 用語調整（的→之）；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "唯一的 UID"
+    },
+    "check": "解析 /etc/passwd 第 3 欄，計數大於 1 的 UID 即不合格，列出 UID 與帳號清單。",
+    "fix": "C 類不自動修復。manual_hint：確認保留哪個帳號後以 usermod -u 改 UID，並以 find / -uid 舊UID 修正檔案擁有權。",
+    "risk": "C",
+    "risk_reason": "需人工判斷帳號或群組用途，修改 ID 或名稱會影響檔案擁有權與登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "unique_gid",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0088",
+      "rhel9": "TWGCB-01-012-0088"
+    },
+    "category": "系統設定與維護",
+    "title": "唯一之 GID",
+    "expected": "為每個群組設定唯一之 GID",
+    "doc_method": "執行文件腳本（cut -d: -f3 /etc/group | sort | uniq -d）找出重複 GID，以 #groupmod -g (GID) (群組名稱) 修正。",
+    "version_diff": "RHEL 9 用語調整（的→之）；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "唯一的 GID"
+    },
+    "check": "解析 /etc/group 第 3 欄，重複 GID 即不合格。",
+    "fix": "C 類不自動修復。manual_hint：確認群組用途後以 groupmod -g 改 GID，並修正檔案群組擁有權。",
+    "risk": "C",
+    "risk_reason": "需人工判斷帳號或群組用途，修改 ID 或名稱會影響檔案擁有權與登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "unique_username",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0089",
+      "rhel9": "TWGCB-01-012-0089"
+    },
+    "category": "系統設定與維護",
+    "title": "唯一之使用者帳號名稱",
+    "expected": "為每個使用者帳號設定唯一之名稱",
+    "doc_method": "執行文件腳本（cut -d: -f1 /etc/passwd | sort | uniq -d）找出重複帳號名稱，編輯 /etc/passwd 修正。",
+    "version_diff": "RHEL 9 用語調整（的→之）；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "唯一的使用者帳號名稱"
+    },
+    "check": "解析 /etc/passwd 第 1 欄，重複名稱即不合格（同時建議比對 /etc/shadow）。",
+    "fix": "C 類不自動修復。manual_hint：以 vipw 手動修正重複帳號，並同步 /etc/shadow。",
+    "risk": "C",
+    "risk_reason": "需人工判斷帳號或群組用途，修改 ID 或名稱會影響檔案擁有權與登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "unique_groupname",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0090",
+      "rhel9": "TWGCB-01-012-0090"
+    },
+    "category": "系統設定與維護",
+    "title": "唯一之群組名稱",
+    "expected": "為每個群組設定唯一之群組名稱",
+    "doc_method": "執行文件腳本（cut -d: -f1 /etc/group | sort | uniq -d）找出重複群組名稱，編輯 /etc/group 修正。",
+    "version_diff": "RHEL 9 用語調整（的→之）；腳本相同。",
+    "type": "custom",
+    "params": {
+      "desc": "唯一的群組名稱"
+    },
+    "check": "解析 /etc/group 第 1 欄，重複名稱即不合格（同時建議比對 /etc/gshadow）。",
+    "fix": "C 類不自動修復。manual_hint：以 vigr 手動修正重複群組，並同步 /etc/gshadow。",
+    "risk": "C",
+    "risk_reason": "需人工判斷帳號或群組用途，修改 ID 或名稱會影響檔案擁有權與登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "shadow_group_empty",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0091",
+      "rhel9": "TWGCB-01-012-0091"
+    },
+    "category": "系統設定與維護",
+    "title": "shadow 群組成員",
+    "expected": "shadow 群組不包含任何使用者",
+    "doc_method": "#awk -F: '($1==\"shadow\") {print $NF}' /etc/group 列出成員；若有，執行 #sed -ri 's/(^shadow:[^:]*:[^:]*:)([^:]+$)/\\1/' /etc/group 移除成員，並 #usermod -g (預設群組名稱) (帳號名稱) 將主要群組為 shadow 的帳號改回預設群組。",
+    "version_diff": "兩版內容相同；RHEL 9 僅用語調整（密碼→通行碼、驗證→鑑別、的→之）。",
+    "type": "custom",
+    "params": {
+      "desc": "shadow 群組無附加成員，且無帳號以 shadow 為主要群組"
+    },
+    "check": "若 /etc/group 無 shadow 群組（RHEL 8/9 預設）直接合格；否則 shadow 行第 4 欄不為空，或 /etc/passwd 有帳號第 4 欄等於 shadow 的 GID，即不合格。",
+    "fix": "備份 /etc/group 與 /etc/gshadow 後，以 gpasswd -M '' shadow 清空成員（同步 gshadow，比文件 sed 只改 /etc/group 更完整）；主要群組為 shadow 的帳號改列人工處理（需決定預設群組）。回滾：還原兩個檔案備份。",
+    "risk": "B",
+    "risk_reason": "移除成員可回滾，但若有服務帳號依賴 shadow 群組讀取 /etc/shadow 進行驗證，可能造成登入或服務驗證失敗。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "RHEL 8/9 預設不存在 shadow 群組（該群組為 Debian 系慣例），通常直接合格。"
+  },
+  {
+    "key": "etc_shells_owner",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0301"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/shells 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "#chown root:root /etc/shells",
+    "version_diff": "RHEL 9 新增項目，RHEL 8 無此規則。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/shells"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/shells 的 uid/gid/mode；擁有者須為 root（uid 0），群組須為 root 之一（以 grp.getgrnam 解析名稱，群組不存在則略過該選項）。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 uid/gid 後執行 chown root:root /etc/shells（Fx.chown）；回滾：chown 回原 uid:gid。檔案若有 SUID/SGID 位元不受影響（一般檔）。",
+    "risk": "A",
+    "risk_reason": "RHEL 預設即為 root:root，修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "RHEL 9（RHEL 8 可選擇性套用）",
+    "existing": false,
+    "notes": "此項技術上也適用 RHEL 8，但 RHEL 8 基準未要求，RHEL 8 主機應回傳不適用。"
+  },
+  {
+    "key": "etc_shells_perm",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0302"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/shells 檔案權限",
+    "expected": "644 或更低權限",
+    "doc_method": "#chmod 644 /etc/shells",
+    "version_diff": "RHEL 9 新增項目，RHEL 8 無此規則。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/shells"
+      ],
+      "owner": null,
+      "groups": null,
+      "max_mode": "0644",
+      "recursive": false
+    },
+    "check": "以 os.stat 取得 /etc/shells 的 uid/gid/mode；權限位元不可超出 0644，即 (mode & 0o7777) & ~上限 == 0。檔案不存在時回傳不適用（NA）。",
+    "fix": "記錄原 mode 後執行 chmod 644 /etc/shells（僅移除多餘位元：new = old & 0o644，避免反而增加權限）（Fx.chmod）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "只移除多餘權限位元，一般使用者仍需讀取 /etc/shells（chsh、ftp 等會讀取）。",
+    "needs_reboot": false,
+    "applies_when": "RHEL 9",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "opasswd_owner",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0303"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/security/opasswd 與 /etc/security/opasswd.old 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "#chown root:root /etc/security/opasswd /etc/security/opasswd.old",
+    "version_diff": "RHEL 9 新增項目，RHEL 8 無此規則。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/security/opasswd",
+        "/etc/security/opasswd.old"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ],
+      "max_mode": null,
+      "recursive": false
+    },
+    "check": "對兩個路徑分別檢查（存在者才檢查）：擁有者 uid 0、群組 gid 0；兩者皆不存在時回傳不適用。",
+    "fix": "對存在的檔案記錄原 uid/gid 後 chown root:root；回滾：chown 回原值。",
+    "risk": "A",
+    "risk_reason": "RHEL 預設即為 root:root，由以 root 執行的 PAM 模組存取。",
+    "needs_reboot": false,
+    "applies_when": "RHEL 9 且檔案存在",
+    "existing": false,
+    "notes": "opasswd 由 pam 套件提供（RHEL 9 預設存在，空檔）；opasswd.old 通常只有在 pam_unix/pam_pwhistory 輪替時才會產生，不存在屬正常。"
+  },
+  {
+    "key": "opasswd_perm",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0304"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/security/opasswd 與 /etc/security/opasswd.old 檔案權限",
+    "expected": "644 或更低權限",
+    "doc_method": "#chmod 644 /etc/security/opasswd /etc/security/opasswd.old",
+    "version_diff": "RHEL 9 新增項目，RHEL 8 無此規則。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/security/opasswd",
+        "/etc/security/opasswd.old"
+      ],
+      "owner": null,
+      "groups": null,
+      "max_mode": "0644",
+      "recursive": false
+    },
+    "check": "對兩個存在的路徑檢查 mode & ~0o644 == 0；皆不存在時回傳不適用。",
+    "fix": "對不合格檔案記錄原 mode 後執行 chmod（new = old & 0o644，不會把 0600 放寬成 0644）；回滾：chmod 回原 mode。",
+    "risk": "A",
+    "risk_reason": "只移除多餘權限位元，PAM 以 root 存取不受影響。",
+    "needs_reboot": false,
+    "applies_when": "RHEL 9 且檔案存在",
+    "existing": false,
+    "notes": "文件設定值 644 會讓一般使用者可讀取歷史密碼雜湊，安全上不理想；RHEL 預設為 0600，符合「644 或更低」。修復時務必只移除位元，不可照文件 chmod 644 把 0600 放寬。說明欄寫「僅供 root 擁有讀取與寫入權限」與 644 不一致。"
+  },
+  {
+    "key": "shells_no_nologin",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0305"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/shells 中不應存在 nologin",
+    "expected": "移除含有 nologin 的行",
+    "doc_method": "#grep -E '^[^#]*\\/nologin$' /etc/shells 確認，若有則以 vim 編輯 /etc/shells 移除含有 nologin 的行。",
+    "version_diff": "RHEL 9 新增項目，RHEL 8 無此規則。",
+    "type": "custom",
+    "params": {
+      "desc": "/etc/shells 無符合 ^[^#]*/nologin$ 的行",
+      "regex": "^[^#]*/nologin$"
+    },
+    "check": "逐行讀取 /etc/shells（去除行尾空白），符合正規表示式 ^[^#]*/nologin$ 的行存在即不合格。",
+    "fix": "備份 /etc/shells 後以 Fx.edit_file 刪除符合的行（保留原權限與 SELinux context）；回滾：還原備份。",
+    "risk": "A",
+    "risk_reason": "RHEL 預設 /etc/shells 不含 nologin，刪除只會讓 nologin 不被視為合法登入 shell，符合其設計用意。",
+    "needs_reboot": false,
+    "applies_when": "RHEL 9",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "chronyd_not_root",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0306"
+    },
+    "category": "系統設定與維護",
+    "title": "禁止 chrony 以 root 權限執行",
+    "expected": "OPTIONS=\"-F 2\"",
+    "doc_method": "以 vim 編輯 /etc/sysconfig/chronyd，在 OPTIONS 中移除「-u root」並加入 OPTIONS=\"-F 2\"，再 #systemctl restart chronyd.service。",
+    "version_diff": "RHEL 9 新增項目，RHEL 8 無此規則。",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/sysconfig/chronyd",
+      "key": "OPTIONS",
+      "value": "-F 2",
+      "compare": "custom",
+      "sep": "=",
+      "dropin": null
+    },
+    "check": "讀取 /etc/sysconfig/chronyd 的 OPTIONS（shell 變數格式，以 shlex 解析引號）：拆成參數後不可含「-u root」（含 -uroot 寫法），且須含「-F 2」；另以 ps -o user= -C chronyd 確認執行中的 chronyd 不是 root（服務未執行時只看設定檔）。",
+    "fix": "備份 /etc/sysconfig/chronyd，移除 OPTIONS 中的 -u root，若無 -F 則加入 -F 2（保留其他既有參數），檔案不存在時建立 OPTIONS=\"-F 2\"；之後 systemctl try-restart chronyd.service（僅在原本執行中時重啟）。回滾：還原檔案並 try-restart chronyd。",
+    "risk": "A",
+    "risk_reason": "RHEL 9 預設即為 OPTIONS=\"-F 2\" 且 chronyd 以 chrony 帳號執行，重啟 chronyd 只造成短暫校時中斷。",
+    "needs_reboot": false,
+    "applies_when": "RHEL 9 且已安裝 chrony（rpm -q chrony）",
+    "existing": false,
+    "notes": "「-F 2」是啟用 seccomp 系統呼叫過濾，與是否以 root 執行無直接關係；不以 root 執行的關鍵是不要指定 -u root（chronyd 編譯預設使用者為 chrony）。設定值以 OPTIONS 含 -F 2 且無 -u root 判定，而非要求整行字面完全相同，以免誤判其他合法參數（如 -4）。"
+  },
+  {
+    "key": "ptrace_scope",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0307"
+    },
+    "category": "系統設定與維護",
+    "title": "ptrace 限制模式",
+    "expected": "啟用（kernel.yama.ptrace_scope=1）",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案，新增或修改 kernel.yama.ptrace_scope=1，並執行 #sysctl -w kernel.yama.ptrace_scope=1。",
+    "version_diff": "RHEL 9 新增項目，RHEL 8 無此規則。",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        "kernel.yama.ptrace_scope=1"
+      ]
+    },
+    "check": "執行期：讀取 /proc/sys/kernel/yama/ptrace_scope 須 >= 1；持久化：依 systemd-sysctl 的優先順序（/etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d、/etc/sysctl.conf，同名檔案 /etc 優先、依檔名排序後者覆蓋）解析最終值須 >= 1。",
+    "fix": "寫入 /etc/sysctl.d/60-gcb-ptrace.conf：kernel.yama.ptrace_scope = 1，並 sysctl -w kernel.yama.ptrace_scope=1；註解掉其他檔案中衝突的設定（先備份）。回滾：刪除該檔、還原被修改檔案，並 sysctl -w 回原值。",
+    "risk": "A",
+    "risk_reason": "只限制非父子程序間的 ptrace，一般服務不受影響。",
+    "needs_reboot": false,
+    "applies_when": "RHEL 9（核心有 Yama LSM）",
+    "existing": false,
+    "notes": "RHEL 9 預設值為 0。設為 1 後一般使用者無法 gdb -p / strace -p 附加到非子程序（root 不受影響），可能影響開發除錯工具。期望值文件寫「啟用」，對應值為 1；值 2、3 更嚴格，檢測接受 >= 1（1、2、3 皆合格），修復寫入 1。"
+  }
+]

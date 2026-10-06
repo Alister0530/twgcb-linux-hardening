@@ -1,0 +1,1644 @@
+[
+  {
+    "key": "cramfs",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0001",
+      "rhel9": "TWGCB-01-012-0001"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "cramfs 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/cramfs.conf，內容：install cramfs /bin/true、blacklist cramfs；執行 #rmmod cramfs；完成後重新開機",
+    "version_diff": "",
+    "type": "module_disabled",
+    "params": {
+      "module": "cramfs"
+    },
+    "check": "1) `modprobe -n -v cramfs` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist cramfs`；3) `lsmod`（/proc/modules）中不得出現 cramfs。若 `modinfo cramfs` 找不到模組且核心未內建（/proc/filesystems 無 cramfs），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/cramfs.conf（若有）；寫入 /etc/modprobe.d/cramfs.conf，內容 `install cramfs /bin/true` 與 `blacklist cramfs`；若模組已載入且未使用則執行 `modprobe -r cramfs`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": true,
+    "notes": "文件要求重開機，但模組未載入時寫入設定即生效，僅在 rmmod 失敗時才需重開機。RHEL 9 核心可能未編譯 cramfs 模組，此時直接判定符合。"
+  },
+  {
+    "key": "squashfs",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0002",
+      "rhel9": "TWGCB-01-012-0002"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "squashfs 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/squashfs.conf，內容：install squashfs /bin/true、blacklist squashfs；執行 #rmmod squashfs；完成後重新開機",
+    "version_diff": "",
+    "type": "module_disabled",
+    "params": {
+      "module": "squashfs"
+    },
+    "check": "1) `modprobe -n -v squashfs` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist squashfs`；3) `lsmod`（/proc/modules）中不得出現 squashfs。若 `modinfo squashfs` 找不到模組且核心未內建（/proc/filesystems 無 squashfs），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/squashfs.conf（若有）；寫入 /etc/modprobe.d/squashfs.conf，內容 `install squashfs /bin/true` 與 `blacklist squashfs`；若模組已載入且未使用則執行 `modprobe -r squashfs`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件提到會影響 Snap，RHEL 預設不使用 Snap；但若有使用 snapd、Flatpak 映像或 squashfs 格式的 live/容器映像會受影響。"
+  },
+  {
+    "key": "udf",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0003",
+      "rhel9": "TWGCB-01-012-0003"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "udf 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/udf.conf，內容：install udf /bin/true、blacklist udf；執行 #rmmod udf；完成後重新開機",
+    "version_diff": "",
+    "type": "module_disabled",
+    "params": {
+      "module": "udf"
+    },
+    "check": "1) `modprobe -n -v udf` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist udf`；3) `lsmod`（/proc/modules）中不得出現 udf。若 `modinfo udf` 找不到模組且核心未內建（/proc/filesystems 無 udf），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/udf.conf（若有）；寫入 /etc/modprobe.d/udf.conf，內容 `install udf /bin/true` 與 `blacklist udf`；若模組已載入且未使用則執行 `modprobe -r udf`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律（Microsoft Azure 上建議排除）",
+    "existing": false,
+    "notes": "文件註明在 Microsoft Azure 上可能影響運作（Azure 佈建使用 UDF 格式的設定光碟），偵測到 Azure（例如 /sys/class/dmi/id/sys_vendor 為 Microsoft Corporation 且有 waagent）時應略過並提示。RHEL 9 文件將 Microsoft 誤植為「Microsot」。"
+  },
+  {
+    "key": "tmp_tmpfs",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0004",
+      "rhel9": "TWGCB-01-012-0004"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/tmp 目錄之檔案系統",
+    "expected": "tmpfs",
+    "doc_method": "(1) 在 /etc/fstab 加入：tmpfs /tmp tmpfs defaults,rw,nosuid,nodev,noexec,relatime 0 0；或 (2) #systemctl unmask tmp.mount、#systemctl enable tmp.mount，編輯 /etc/systemd/system/local-fs.target.wants/tmp.mount：[Mount] What=tmpfs、Where=/tmp、Type=tmpfs、Options=mode=1777,strictatime,noexec,nodev,nosuid",
+    "version_diff": "",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/tmp",
+      "fstype": "tmpfs"
+    },
+    "check": "`findmnt -kn -o FSTYPE /tmp`（或解析 /proc/self/mountinfo）須為 tmpfs；另確認開機時會維持：/etc/fstab 有 /tmp 的 tmpfs 列，或 `systemctl is-enabled tmp.mount` 為 enabled 且未被遮蔽。",
+    "fix": "優先用 systemd：備份 /etc/fstab；`systemctl unmask tmp.mount`，建立 drop-in /etc/systemd/system/tmp.mount.d/gcb.conf（[Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid），`systemctl daemon-reload`、`systemctl enable tmp.mount`；若 fstab 已有 /tmp 列則改該列而不啟用 tmp.mount。不要即時掛載（會遮住現有 /tmp 內容），標示需重開機。回滾：刪除 drop-in、`systemctl disable tmp.mount`、還原 fstab。",
+    "risk": "B",
+    "risk_reason": "改變 /tmp 為記憶體檔案系統會遮蔽現有內容、佔用 RAM，需重開機才安全生效",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件做法 (2) 直接編輯 local-fs.target.wants/tmp.mount，這是指向 /usr/lib/systemd/system/tmp.mount 的符號連結，等於改到套件檔案，升級會被覆蓋，應改用 drop-in。RHEL 9 的 tmp.mount 原生選項含 size=50%,nr_inodes=1m，覆寫 Options 時建議保留 size 限制。"
+  },
+  {
+    "key": "tmp_nodev",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0005",
+      "rhel9": "TWGCB-01-012-0005"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/tmp 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "(1) 編輯 /etc/fstab，在 /tmp 列第 4 欄加入「,nodev」，執行 #mount -o remount,nodev /tmp；或 (2) 編輯 /etc/systemd/system/local-fs.target.wants/tmp.mount 的 [Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid，再執行 #mount -o remount,nodev /tmp",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/tmp",
+      "option": "nodev"
+    },
+    "check": "以 `findmnt -kn -o OPTIONS /tmp`（或 /proc/self/mountinfo）確認目前掛載選項含 nodev；並確認持久設定也含 nodev：/etc/fstab 中 /tmp 列第 4 欄或 tmp.mount（含 drop-in，`systemctl cat tmp.mount`）的 Options。/tmp 非獨立掛載時判定不符合（並提示先完成 tmp_tmpfs）。",
+    "fix": "備份 /etc/fstab 與既有 drop-in；若 /tmp 由 fstab 掛載，在該列第 4 欄加入 ,nodev；若由 tmp.mount 掛載，寫入 /etc/systemd/system/tmp.mount.d/gcb.conf 的 Options（含 nodev）並 `systemctl daemon-reload`；接著執行 `mount -o remount,nodev /tmp` 立即生效。回滾：還原 fstab／刪除 drop-in、daemon-reload，再 `mount -o remount,dev /tmp`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab／tmp.mount 掛載選項，錯誤時可能影響開機",
+    "needs_reboot": false,
+    "applies_when": "/tmp 為獨立掛載（tmpfs 或獨立磁區）",
+    "existing": false,
+    "notes": "文件做法 (2) 直接編輯符號連結指向的套件檔，建議改用 drop-in。"
+  },
+  {
+    "key": "tmp_nosuid",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0006",
+      "rhel9": "TWGCB-01-012-0006"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/tmp 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "(1) 編輯 /etc/fstab，在 /tmp 列第 4 欄加入「,nosuid」，執行 #mount -o remount,nosuid /tmp；或 (2) 編輯 /etc/systemd/system/local-fs.target.wants/tmp.mount 的 [Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid，再執行 #mount -o remount,nosuid /tmp",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/tmp",
+      "option": "nosuid"
+    },
+    "check": "以 `findmnt -kn -o OPTIONS /tmp`（或 /proc/self/mountinfo）確認目前掛載選項含 nosuid；並確認持久設定也含 nosuid：/etc/fstab 中 /tmp 列第 4 欄或 tmp.mount（含 drop-in，`systemctl cat tmp.mount`）的 Options。/tmp 非獨立掛載時判定不符合（並提示先完成 tmp_tmpfs）。",
+    "fix": "備份 /etc/fstab 與既有 drop-in；若 /tmp 由 fstab 掛載，在該列第 4 欄加入 ,nosuid；若由 tmp.mount 掛載，寫入 /etc/systemd/system/tmp.mount.d/gcb.conf 的 Options（含 nosuid）並 `systemctl daemon-reload`；接著執行 `mount -o remount,nosuid /tmp` 立即生效。回滾：還原 fstab／刪除 drop-in、daemon-reload，再 `mount -o remount,suid /tmp`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab／tmp.mount 掛載選項，錯誤時可能影響開機",
+    "needs_reboot": false,
+    "applies_when": "/tmp 為獨立掛載（tmpfs 或獨立磁區）",
+    "existing": false,
+    "notes": "文件做法 (2) 直接編輯符號連結指向的套件檔，建議改用 drop-in。"
+  },
+  {
+    "key": "tmp_noexec",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0007",
+      "rhel9": "TWGCB-01-012-0007"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/tmp 目錄之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "(1) 編輯 /etc/fstab，在 /tmp 列第 4 欄加入「,noexec」，執行 #mount -o remount,noexec /tmp；或 (2) 編輯 /etc/systemd/system/local-fs.target.wants/tmp.mount 的 [Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid，再執行 #mount -o remount,noexec /tmp",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/tmp",
+      "option": "noexec"
+    },
+    "check": "以 `findmnt -kn -o OPTIONS /tmp`（或 /proc/self/mountinfo）確認目前掛載選項含 noexec；並確認持久設定也含 noexec：/etc/fstab 中 /tmp 列第 4 欄或 tmp.mount（含 drop-in，`systemctl cat tmp.mount`）的 Options。/tmp 非獨立掛載時判定不符合（並提示先完成 tmp_tmpfs）。",
+    "fix": "備份 /etc/fstab 與既有 drop-in；若 /tmp 由 fstab 掛載，在該列第 4 欄加入 ,noexec；若由 tmp.mount 掛載，寫入 /etc/systemd/system/tmp.mount.d/gcb.conf 的 Options（含 noexec）並 `systemctl daemon-reload`；接著執行 `mount -o remount,noexec /tmp` 立即生效。回滾：還原 fstab／刪除 drop-in、daemon-reload，再 `mount -o remount,exec /tmp`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab／tmp.mount 掛載選項，錯誤時可能影響開機，且 noexec 可能使在 /tmp 執行程式的安裝程式失敗",
+    "needs_reboot": false,
+    "applies_when": "/tmp 為獨立掛載（tmpfs 或獨立磁區）",
+    "existing": false,
+    "notes": "文件做法 (2) 直接編輯符號連結指向的套件檔，建議改用 drop-in。noexec 可能使部分廠商安裝程式或在 /tmp 編譯執行的工具失敗。"
+  },
+  {
+    "key": "var_partition",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0008",
+      "rhel9": "TWGCB-01-012-0008"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/var 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新裝系統於安裝時為 /var 建立獨立磁區；已安裝系統先全系統備份，以 gdisk 新增 8e00（LVM）磁區、#partprobe、#pvcreate /dev/sda3、#vgcreate -s 16M varvg /dev/sda3、#lvcreate -l 15 -n varlv varvg、#mkfs.xfs /dev/varvg/varlv，並在 /etc/fstab 加入：/dev/varvg/varlv /var xfs defaults 0 0",
+    "version_diff": "",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/var"
+    },
+    "check": "`findmnt -kn /var`（或 /proc/self/mountinfo 的掛載點欄位完全等於 /var）有結果即符合；另確認 /etc/fstab 有 /var 的掛載列（或對應 systemd .mount 單元），避免只是暫時掛載。",
+    "fix": "不自動修復，只輸出文件中的 LVM 建立步驟供人工處理（需資料搬移與停機）。",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移資料，無法安全自動化",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "existing": true,
+    "notes": "文件範例 fstab 只寫 defaults，與相關的 nodev/nosuid/noexec 規則不一致，實作時應一併加上要求的選項。已存在的資料需先搬移到新磁區（建議在救援模式下 rsync），且 SELinux 情境需 restorecon。"
+  },
+  {
+    "key": "var_tmp_partition",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0009",
+      "rhel9": "TWGCB-01-012-0009"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/tmp 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新裝系統於安裝時為 /var/tmp 建立獨立磁區；已安裝系統先全系統備份，以 gdisk 新增 8e00（LVM）磁區、#partprobe、#pvcreate /dev/sda3、#vgcreate -s 16M vartmpvg /dev/sda3、#lvcreate -l 15 -n vartmplv vartmpvg、#mkfs.xfs /dev/vartmpvg/vartmplv，並在 /etc/fstab 加入：/dev/vartmpvg/vartmplv /var/tmp xfs defaults 0 0",
+    "version_diff": "",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/var/tmp"
+    },
+    "check": "`findmnt -kn /var/tmp`（或 /proc/self/mountinfo 的掛載點欄位完全等於 /var/tmp）有結果即符合；另確認 /etc/fstab 有 /var/tmp 的掛載列（或對應 systemd .mount 單元），避免只是暫時掛載。",
+    "fix": "不自動修復，只輸出文件中的 LVM 建立步驟供人工處理（需資料搬移與停機）。",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移資料，無法安全自動化",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件範例 fstab 只寫 defaults，與相關的 nodev/nosuid/noexec 規則不一致，實作時應一併加上要求的選項。"
+  },
+  {
+    "key": "var_tmp_nodev",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0010",
+      "rhel9": "TWGCB-01-012-0010"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/tmp 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在 /var/tmp 列第 4 欄加入「,nodev」；執行 #mount -o remount,nodev /var/tmp",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/tmp",
+      "option": "nodev"
+    },
+    "check": "以 `findmnt -kn -o OPTIONS /var/tmp`（或 /proc/self/mountinfo）確認目前掛載選項含 nodev；並確認持久設定也含 nodev：/etc/fstab 中 /var/tmp 列第 4 欄；/var/tmp 不是獨立掛載時判定為不適用（由 var_tmp_partition 處理）。",
+    "fix": "備份 /etc/fstab；在 /var/tmp 列的選項欄加入 nodev（保留原選項），`systemctl daemon-reload` 後執行 `mount -o remount,nodev /var/tmp`。回滾：還原 fstab、daemon-reload、`mount -o remount,dev /var/tmp`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項，錯誤時可能影響開機",
+    "needs_reboot": false,
+    "applies_when": "/var/tmp 為獨立掛載",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "var_tmp_nosuid",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0011",
+      "rhel9": "TWGCB-01-012-0011"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/tmp 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在 /var/tmp 列第 4 欄加入「,nosuid」；執行 #mount -o remount,nosuid /var/tmp",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/tmp",
+      "option": "nosuid"
+    },
+    "check": "以 `findmnt -kn -o OPTIONS /var/tmp`（或 /proc/self/mountinfo）確認目前掛載選項含 nosuid；並確認持久設定也含 nosuid：/etc/fstab 中 /var/tmp 列第 4 欄；/var/tmp 不是獨立掛載時判定為不適用（由 var_tmp_partition 處理）。",
+    "fix": "備份 /etc/fstab；在 /var/tmp 列的選項欄加入 nosuid（保留原選項），`systemctl daemon-reload` 後執行 `mount -o remount,nosuid /var/tmp`。回滾：還原 fstab、daemon-reload、`mount -o remount,suid /var/tmp`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項，錯誤時可能影響開機",
+    "needs_reboot": false,
+    "applies_when": "/var/tmp 為獨立掛載",
+    "existing": false,
+    "notes": ""
+  },
+  {
+    "key": "var_tmp_noexec",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0012",
+      "rhel9": "TWGCB-01-012-0012"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/tmp 目錄之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在 /var/tmp 列第 4 欄加入「,noexec」；執行 #mount -o remount,noexec /var/tmp",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/tmp",
+      "option": "noexec"
+    },
+    "check": "以 `findmnt -kn -o OPTIONS /var/tmp`（或 /proc/self/mountinfo）確認目前掛載選項含 noexec；並確認持久設定也含 noexec：/etc/fstab 中 /var/tmp 列第 4 欄；/var/tmp 不是獨立掛載時判定為不適用（由 var_tmp_partition 處理）。",
+    "fix": "備份 /etc/fstab；在 /var/tmp 列的選項欄加入 noexec（保留原選項），`systemctl daemon-reload` 後執行 `mount -o remount,noexec /var/tmp`。回滾：還原 fstab、daemon-reload、`mount -o remount,exec /var/tmp`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項，錯誤時可能影響開機",
+    "needs_reboot": false,
+    "applies_when": "/var/tmp 為獨立掛載",
+    "existing": false,
+    "notes": "noexec 可能影響在 /var/tmp 解壓並執行的安裝程式（例如部分廠商代理程式）。"
+  },
+  {
+    "key": "var_log_partition",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0013",
+      "rhel9": "TWGCB-01-012-0013"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新裝系統於安裝時為 /var/log 建立獨立磁區；已安裝系統先全系統備份，以 gdisk 新增 8e00（LVM）磁區、#partprobe、#pvcreate /dev/sda3、#vgcreate -s 16M varlogvg /dev/sda3、#lvcreate -l 15 -n varloglv varlogvg、#mkfs.xfs /dev/varlogvg/varloglv，並在 /etc/fstab 加入：/dev/varlogvg/varloglv /var/log xfs defaults 0 0",
+    "version_diff": "",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/var/log"
+    },
+    "check": "`findmnt -kn /var/log`（或 /proc/self/mountinfo 的掛載點欄位完全等於 /var/log）有結果即符合；另確認 /etc/fstab 有 /var/log 的掛載列（或對應 systemd .mount 單元），避免只是暫時掛載。",
+    "fix": "不自動修復，只輸出文件中的 LVM 建立步驟供人工處理（需資料搬移與停機）。",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移資料，無法安全自動化",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件範例 fstab 只寫 defaults，與相關的 nodev/nosuid/noexec 規則不一致，實作時應一併加上要求的選項。搬移時需先停止 rsyslog、journald 等寫入服務。"
+  },
+  {
+    "key": "var_log_audit_partition",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0014",
+      "rhel9": "TWGCB-01-012-0014"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log/audit 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新裝系統於安裝時為 /var/log/audit 建立獨立磁區；已安裝系統先全系統備份，以 gdisk 新增 8e00（LVM）磁區、#partprobe、#pvcreate /dev/sda3、#vgcreate -s 16M varlogadvg /dev/sda3、#lvcreate -l 15 -n varlogadlv varlogadvg、#mkfs.xfs /dev/varlogadvg/varlogadlv，並在 /etc/fstab 加入：/dev/varlogadvg/varlogadlv /var/log/audit xfs defaults 0 0",
+    "version_diff": "",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/var/log/audit"
+    },
+    "check": "`findmnt -kn /var/log/audit`（或 /proc/self/mountinfo 的掛載點欄位完全等於 /var/log/audit）有結果即符合；另確認 /etc/fstab 有 /var/log/audit 的掛載列（或對應 systemd .mount 單元），避免只是暫時掛載。",
+    "fix": "不自動修復，只輸出文件中的 LVM 建立步驟供人工處理（需資料搬移與停機）。",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移資料，無法安全自動化",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件範例 fstab 只寫 defaults，與相關的 nodev/nosuid/noexec 規則不一致，實作時應一併加上要求的選項。搬移時需先停止 auditd（RHEL 上需 `service auditd stop`，systemctl 不允許手動停止）。"
+  },
+  {
+    "key": "home_partition",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0015",
+      "rhel9": "TWGCB-01-012-0015"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/home 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新裝系統於安裝時為 /home 建立獨立磁區；已安裝系統先全系統備份，以 gdisk 新增 8e00（LVM）磁區、#partprobe、#pvcreate /dev/sda3、#vgcreate -s 16M homevg /dev/sda3、#lvcreate -l 15 -n homelv homevg、#mkfs.xfs /dev/homevg/homelv，並在 /etc/fstab 加入：/dev/homevg/homelv /home xfs defaults 0 0",
+    "version_diff": "",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/home"
+    },
+    "check": "`findmnt -kn /home`（或 /proc/self/mountinfo 的掛載點欄位完全等於 /home）有結果即符合；另確認 /etc/fstab 有 /home 的掛載列（或對應 systemd .mount 單元），避免只是暫時掛載。",
+    "fix": "不自動修復，只輸出文件中的 LVM 建立步驟供人工處理（需資料搬移與停機）。",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移資料，無法安全自動化",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件範例 fstab 只寫 defaults，與相關的 nodev/nosuid/noexec 規則不一致，實作時應一併加上要求的選項。"
+  },
+  {
+    "key": "home_nodev",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0016",
+      "rhel9": "TWGCB-01-012-0016"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/home 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在 /home 列第 4 欄加入「,nodev」；執行 #mount -o remount,nodev /home",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/home",
+      "option": "nodev"
+    },
+    "check": "以 `findmnt -kn -o OPTIONS /home`（或 /proc/self/mountinfo）確認目前掛載選項含 nodev；並確認持久設定也含 nodev：/etc/fstab 中 /home 列第 4 欄；/home 不是獨立掛載時判定為不適用（由 home_partition 處理）。",
+    "fix": "備份 /etc/fstab；在 /home 列的選項欄加入 nodev，`systemctl daemon-reload` 後執行 `mount -o remount,nodev /home`。回滾：還原 fstab、daemon-reload、`mount -o remount,dev /home`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項，錯誤時可能影響開機",
+    "needs_reboot": false,
+    "applies_when": "/home 為獨立掛載",
+    "existing": false,
+    "notes": "與 home_dirs_nodev（0023）在 /home 為獨立磁區時檢查同一個掛載點，結果應一致。"
+  },
+  {
+    "key": "dev_shm_nodev",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0017",
+      "rhel9": "TWGCB-01-012-0017"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/dev/shm 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在 /dev/shm 列第 4 欄加入「,nodev」；若掛載點不存在，新增：/dev/shm tmpfs rw,nodev,seclabel 0 0；執行 #mount -o remount,nodev /dev/shm",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/dev/shm",
+      "option": "nodev"
+    },
+    "check": "`findmnt -kn -o OPTIONS /dev/shm` 須含 nodev；且 /etc/fstab 須有 /dev/shm 列並含 nodev（RHEL 預設由 systemd 以 rw,nosuid,nodev 掛載、fstab 無此列，因此 nodev/nosuid 執行期通常已符合，但缺 noexec，且無 fstab 列時重開機後無法保證）。",
+    "fix": "備份 /etc/fstab；若無 /dev/shm 列，新增 `tmpfs /dev/shm tmpfs defaults,nodev,nosuid,noexec 0 0`（一次補齊三項）；已有則在選項欄加入 nodev；`systemctl daemon-reload` 後執行 `mount -o remount,nodev /dev/shm`（不會清除內容）。回滾：還原 fstab、daemon-reload、`mount -o remount,dev /dev/shm`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件範例「/dev/shm tmpfs rw, nodev,seclabel 0 0」只有 5 欄，缺少第 1 欄裝置名稱（應為 tmpfs /dev/shm tmpfs ...），且「rw,」後的空格會使 fstab 解析錯誤，實作時不可照抄。"
+  },
+  {
+    "key": "dev_shm_nosuid",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0018",
+      "rhel9": "TWGCB-01-012-0018"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/dev/shm 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在 /dev/shm 列第 4 欄加入「,nosuid」；若掛載點不存在，新增：/dev/shm tmpfs rw,nosuid,seclabel 0 0；執行 #mount -o remount,nosuid /dev/shm",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/dev/shm",
+      "option": "nosuid"
+    },
+    "check": "`findmnt -kn -o OPTIONS /dev/shm` 須含 nosuid；且 /etc/fstab 須有 /dev/shm 列並含 nosuid（RHEL 預設由 systemd 以 rw,nosuid,nodev 掛載、fstab 無此列，因此 nodev/nosuid 執行期通常已符合，但缺 noexec，且無 fstab 列時重開機後無法保證）。",
+    "fix": "備份 /etc/fstab；若無 /dev/shm 列，新增 `tmpfs /dev/shm tmpfs defaults,nodev,nosuid,noexec 0 0`（一次補齊三項）；已有則在選項欄加入 nosuid；`systemctl daemon-reload` 後執行 `mount -o remount,nosuid /dev/shm`（不會清除內容）。回滾：還原 fstab、daemon-reload、`mount -o remount,suid /dev/shm`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件範例「/dev/shm tmpfs rw, nosuid,seclabel 0 0」只有 5 欄，缺少第 1 欄裝置名稱（應為 tmpfs /dev/shm tmpfs ...），且「rw,」後的空格會使 fstab 解析錯誤，實作時不可照抄。"
+  },
+  {
+    "key": "dev_shm_noexec",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0019",
+      "rhel9": "TWGCB-01-012-0019"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定/dev/shm 目錄之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在 /dev/shm 列第 4 欄加入「,noexec」；若掛載點不存在，新增：/dev/shm tmpfs rw,noexec,seclabel 0 0；執行 #mount -o remount,noexec /dev/shm",
+    "version_diff": "",
+    "type": "mount_option",
+    "params": {
+      "mount": "/dev/shm",
+      "option": "noexec"
+    },
+    "check": "`findmnt -kn -o OPTIONS /dev/shm` 須含 noexec；且 /etc/fstab 須有 /dev/shm 列並含 noexec（RHEL 預設由 systemd 以 rw,nosuid,nodev 掛載、fstab 無此列，因此 nodev/nosuid 執行期通常已符合，但缺 noexec，且無 fstab 列時重開機後無法保證）。",
+    "fix": "備份 /etc/fstab；若無 /dev/shm 列，新增 `tmpfs /dev/shm tmpfs defaults,nodev,nosuid,noexec 0 0`（一次補齊三項）；已有則在選項欄加入 noexec；`systemctl daemon-reload` 後執行 `mount -o remount,noexec /dev/shm`（不會清除內容）。回滾：還原 fstab、daemon-reload、`mount -o remount,exec /dev/shm`。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項，noexec 可能影響使用共享記憶體執行程式碼的應用",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "文件範例「/dev/shm tmpfs rw, noexec,seclabel 0 0」只有 5 欄，缺少第 1 欄裝置名稱（應為 tmpfs /dev/shm tmpfs ...），且「rw,」後的空格會使 fstab 解析錯誤，實作時不可照抄。noexec 可能影響 Oracle DB、部分 JIT／瀏覽器元件等使用 /dev/shm 的程式。"
+  },
+  {
+    "key": "removable_nodev",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0020",
+      "rhel9": "TWGCB-01-012-0020"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定可攜式儲存裝置之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "執行 #mount 檢查是否掛載可攜式儲存裝置；若有，編輯 /etc/fstab，在該裝置列第 4 欄加入「,nodev」",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "可攜式裝置（RM=1 或 TRAN=usb）之 fstab 項目與目前掛載皆須含 nodev",
+      "option": "nodev"
+    },
+    "check": "以 `lsblk -rno NAME,RM,TRAN,MOUNTPOINT` 找出可攜式裝置（RM=1 或 TRAN=usb，含其分割區）；比對 /proc/self/mountinfo 的目前掛載與 /etc/fstab 中指向這些裝置（以 /dev 路徑、UUID=、LABEL= 解析，可用 `blkid`）的項目，選項皆須含 nodev。找不到任何可攜式裝置項目即判定不適用／符合。",
+    "fix": "只修改能明確對應到可攜式裝置的 fstab 列：備份 /etc/fstab，在選項欄加入 nodev，若已掛載則 `mount -o remount,nodev <掛載點>`。無法判定的裝置只回報、不修改。回滾：還原 fstab 並 remount,dev。",
+    "risk": "B",
+    "risk_reason": "需判斷裝置類型並修改 fstab，誤判可能影響資料磁碟掛載",
+    "needs_reboot": false,
+    "applies_when": "存在可攜式儲存裝置的 fstab 項目或掛載",
+    "existing": false,
+    "notes": "RHEL 8 文件說明誤寫為「無法在/home 目錄建立裝置檔案」，RHEL 9 已更正為可攜式儲存裝置。透過 udisks2 自動掛載的裝置不經 fstab，udisks2 預設已帶 nosuid,nodev，但無 noexec。"
+  },
+  {
+    "key": "removable_nosuid",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0021",
+      "rhel9": "TWGCB-01-012-0021"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定可攜式儲存裝置之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "執行 #mount 檢查是否掛載可攜式儲存裝置；若有，編輯 /etc/fstab，在該裝置列第 4 欄加入「,nosuid」",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "可攜式裝置（RM=1 或 TRAN=usb）之 fstab 項目與目前掛載皆須含 nosuid",
+      "option": "nosuid"
+    },
+    "check": "以 `lsblk -rno NAME,RM,TRAN,MOUNTPOINT` 找出可攜式裝置（RM=1 或 TRAN=usb，含其分割區）；比對 /proc/self/mountinfo 的目前掛載與 /etc/fstab 中指向這些裝置（以 /dev 路徑、UUID=、LABEL= 解析，可用 `blkid`）的項目，選項皆須含 nosuid。找不到任何可攜式裝置項目即判定不適用／符合。",
+    "fix": "只修改能明確對應到可攜式裝置的 fstab 列：備份 /etc/fstab，在選項欄加入 nosuid，若已掛載則 `mount -o remount,nosuid <掛載點>`。無法判定的裝置只回報、不修改。回滾：還原 fstab 並 remount,suid。",
+    "risk": "B",
+    "risk_reason": "需判斷裝置類型並修改 fstab，誤判可能影響資料磁碟掛載",
+    "needs_reboot": false,
+    "applies_when": "存在可攜式儲存裝置的 fstab 項目或掛載",
+    "existing": false,
+    "notes": "透過 udisks2 自動掛載的裝置不經 fstab，udisks2 預設已帶 nosuid,nodev，但無 noexec。"
+  },
+  {
+    "key": "removable_noexec",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0022",
+      "rhel9": "TWGCB-01-012-0022"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定可攜式儲存裝置之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "執行 #mount 檢查是否掛載可攜式儲存裝置；若有，編輯 /etc/fstab，在該裝置列第 4 欄加入「,noexec」",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "可攜式裝置（RM=1 或 TRAN=usb）之 fstab 項目與目前掛載皆須含 noexec",
+      "option": "noexec"
+    },
+    "check": "以 `lsblk -rno NAME,RM,TRAN,MOUNTPOINT` 找出可攜式裝置（RM=1 或 TRAN=usb，含其分割區）；比對 /proc/self/mountinfo 的目前掛載與 /etc/fstab 中指向這些裝置（以 /dev 路徑、UUID=、LABEL= 解析，可用 `blkid`）的項目，選項皆須含 noexec。找不到任何可攜式裝置項目即判定不適用／符合。",
+    "fix": "只修改能明確對應到可攜式裝置的 fstab 列：備份 /etc/fstab，在選項欄加入 noexec，若已掛載則 `mount -o remount,noexec <掛載點>`。無法判定的裝置只回報、不修改。回滾：還原 fstab 並 remount,exec。",
+    "risk": "B",
+    "risk_reason": "需判斷裝置類型並修改 fstab，誤判可能影響資料磁碟掛載",
+    "needs_reboot": false,
+    "applies_when": "存在可攜式儲存裝置的 fstab 項目或掛載",
+    "existing": false,
+    "notes": "透過 udisks2 自動掛載的裝置不經 fstab，udisks2 預設已帶 nosuid,nodev，但無 noexec。"
+  },
+  {
+    "key": "home_dirs_nodev",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0023",
+      "rhel9": "TWGCB-01-012-0023"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定使用者家目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "執行 #awk -F: '($3>=1000)&&($1!=\"nobody\"){print $1,$3,$6}' /etc/passwd 找出使用者家目錄；以 #more /etc/fstab 檢查；若家目錄掛載在獨立檔案系統，編輯 /etc/fstab，在該列第 4 欄加入「,nodev」",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "UID>=1000（不含 nobody）之使用者家目錄所在的非根掛載點須含 nodev",
+      "option": "nodev",
+      "uid_min": 1000
+    },
+    "check": "讀取 /etc/passwd，取 UID>=1000（UID_MIN 可由 /etc/login.defs 取得）且帳號不是 nobody 的家目錄；對每個存在的家目錄以 `findmnt -kn -T <home>` 取得所屬掛載點；掛載點不是 / 者，其目前選項與 /etc/fstab 對應列皆須含 nodev。所有家目錄都在根檔案系統上則判定不適用。",
+    "fix": "備份 /etc/fstab；在找出的掛載點列選項欄加入 nodev，`systemctl daemon-reload` 後 `mount -o remount,nodev <掛載點>`。家目錄位於 NFS/autofs 時改由 nfs_nodev 規則或人工處理。回滾：還原 fstab 並 remount,dev。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項",
+    "needs_reboot": false,
+    "applies_when": "使用者家目錄位於獨立掛載的檔案系統",
+    "existing": false,
+    "notes": "文件 awk 指令因 PDF 斷行為「pri nt」，正確為 print。"
+  },
+  {
+    "key": "home_dirs_nosuid",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0024",
+      "rhel9": "TWGCB-01-012-0024"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定使用者家目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "執行 #awk -F: '($3>=1000)&&($1!=\"nobody\"){print $1,$3,$6}' /etc/passwd 找出使用者家目錄；以 #more /etc/fstab 檢查；若家目錄掛載在獨立檔案系統，編輯 /etc/fstab，在該列第 4 欄加入「,nosuid」",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "UID>=1000（不含 nobody）之使用者家目錄所在的非根掛載點須含 nosuid",
+      "option": "nosuid",
+      "uid_min": 1000
+    },
+    "check": "讀取 /etc/passwd，取 UID>=1000（UID_MIN 可由 /etc/login.defs 取得）且帳號不是 nobody 的家目錄；對每個存在的家目錄以 `findmnt -kn -T <home>` 取得所屬掛載點；掛載點不是 / 者，其目前選項與 /etc/fstab 對應列皆須含 nosuid。所有家目錄都在根檔案系統上則判定不適用。",
+    "fix": "備份 /etc/fstab；在找出的掛載點列選項欄加入 nosuid，`systemctl daemon-reload` 後 `mount -o remount,nosuid <掛載點>`。家目錄位於 NFS/autofs 時改由 nfs_nosuid 規則或人工處理。回滾：還原 fstab 並 remount,suid。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項",
+    "needs_reboot": false,
+    "applies_when": "使用者家目錄位於獨立掛載的檔案系統",
+    "existing": false,
+    "notes": "文件 awk 指令因 PDF 斷行為「pri nt」，正確為 print。"
+  },
+  {
+    "key": "home_dirs_noexec",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0025",
+      "rhel9": "TWGCB-01-012-0025"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定使用者家目錄之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "執行 #awk -F: '($3>=1000)&&($1!=\"nobody\"){print $1,$3,$6}' /etc/passwd 找出使用者家目錄；以 #more /etc/fstab 檢查；若家目錄掛載在獨立檔案系統，編輯 /etc/fstab，在該列第 4 欄加入「,noexec」",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "UID>=1000（不含 nobody）之使用者家目錄所在的非根掛載點須含 noexec",
+      "option": "noexec",
+      "uid_min": 1000
+    },
+    "check": "讀取 /etc/passwd，取 UID>=1000（UID_MIN 可由 /etc/login.defs 取得）且帳號不是 nobody 的家目錄；對每個存在的家目錄以 `findmnt -kn -T <home>` 取得所屬掛載點；掛載點不是 / 者，其目前選項與 /etc/fstab 對應列皆須含 noexec。所有家目錄都在根檔案系統上則判定不適用。",
+    "fix": "備份 /etc/fstab；在找出的掛載點列選項欄加入 noexec，`systemctl daemon-reload` 後 `mount -o remount,noexec <掛載點>`。家目錄位於 NFS/autofs 時改由 nfs_noexec 規則或人工處理。回滾：還原 fstab 並 remount,exec。",
+    "risk": "B",
+    "risk_reason": "修改 fstab 掛載選項，noexec 會讓使用者無法執行家目錄中的程式或指令稿",
+    "needs_reboot": false,
+    "applies_when": "使用者家目錄位於獨立掛載的檔案系統",
+    "existing": false,
+    "notes": "文件 awk 指令因 PDF 斷行為「pri nt」，正確為 print。noexec 會影響開發者在家目錄編譯或執行指令稿、Python venv 等，務必先確認用途。"
+  },
+  {
+    "key": "nfs_nodev",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0026",
+      "rhel9": "TWGCB-01-012-0026"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定 NFS 檔案系統之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "執行 #grep nfs /etc/fstab 確認是否掛載 NFS；若有，編輯 /etc/fstab，在 NFS 列第 4 欄加入「,nodev」",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "fstab 中所有 nfs/nfs4 項目與目前 NFS 掛載皆須含 nodev",
+      "option": "nodev",
+      "fstypes": [
+        "nfs",
+        "nfs4"
+      ]
+    },
+    "check": "解析 /etc/fstab（略過註解），第 3 欄為 nfs 或 nfs4 的列，選項須含 nodev；另以 `findmnt -kn -t nfs,nfs4 -o TARGET,OPTIONS` 確認目前掛載。沒有 NFS 項目即判定不適用。",
+    "fix": "備份 /etc/fstab；在各 NFS 列選項欄加入 nodev，`systemctl daemon-reload` 後對已掛載者 `mount -o remount,nodev <掛載點>`。回滾：還原 fstab 並 remount,dev。",
+    "risk": "B",
+    "risk_reason": "修改網路檔案系統掛載選項，可能影響依賴該共享的服務",
+    "needs_reboot": false,
+    "applies_when": "/etc/fstab 有 NFS 掛載",
+    "existing": false,
+    "notes": "文件的 `grep nfs /etc/fstab` 也會比對到註解與含 nfs 字樣的路徑，實作需依欄位判斷。autofs 管理的 NFS 掛載不在 fstab 中，需另查 /etc/auto.* 的選項。"
+  },
+  {
+    "key": "nfs_nosuid",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0027",
+      "rhel9": "TWGCB-01-012-0027"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定 NFS 檔案系統之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "執行 #grep nfs /etc/fstab 確認是否掛載 NFS；若有，編輯 /etc/fstab，在 NFS 列第 4 欄加入「,nosuid」",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "fstab 中所有 nfs/nfs4 項目與目前 NFS 掛載皆須含 nosuid",
+      "option": "nosuid",
+      "fstypes": [
+        "nfs",
+        "nfs4"
+      ]
+    },
+    "check": "解析 /etc/fstab（略過註解），第 3 欄為 nfs 或 nfs4 的列，選項須含 nosuid；另以 `findmnt -kn -t nfs,nfs4 -o TARGET,OPTIONS` 確認目前掛載。沒有 NFS 項目即判定不適用。",
+    "fix": "備份 /etc/fstab；在各 NFS 列選項欄加入 nosuid，`systemctl daemon-reload` 後對已掛載者 `mount -o remount,nosuid <掛載點>`。回滾：還原 fstab 並 remount,suid。",
+    "risk": "B",
+    "risk_reason": "修改網路檔案系統掛載選項，可能影響依賴該共享的服務",
+    "needs_reboot": false,
+    "applies_when": "/etc/fstab 有 NFS 掛載",
+    "existing": false,
+    "notes": "文件的 `grep nfs /etc/fstab` 也會比對到註解與含 nfs 字樣的路徑，實作需依欄位判斷。autofs 管理的 NFS 掛載不在 fstab 中，需另查 /etc/auto.* 的選項。"
+  },
+  {
+    "key": "nfs_noexec",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0028",
+      "rhel9": "TWGCB-01-012-0028"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定 NFS 檔案系統之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "執行 #grep nfs /etc/fstab 確認是否掛載 NFS；若有，編輯 /etc/fstab，在 NFS 列第 4 欄加入「,noexec」",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "fstab 中所有 nfs/nfs4 項目與目前 NFS 掛載皆須含 noexec",
+      "option": "noexec",
+      "fstypes": [
+        "nfs",
+        "nfs4"
+      ]
+    },
+    "check": "解析 /etc/fstab（略過註解），第 3 欄為 nfs 或 nfs4 的列，選項須含 noexec；另以 `findmnt -kn -t nfs,nfs4 -o TARGET,OPTIONS` 確認目前掛載。沒有 NFS 項目即判定不適用。",
+    "fix": "備份 /etc/fstab；在各 NFS 列選項欄加入 noexec，`systemctl daemon-reload` 後對已掛載者 `mount -o remount,noexec <掛載點>`。回滾：還原 fstab 並 remount,exec。",
+    "risk": "B",
+    "risk_reason": "修改網路檔案系統掛載選項，可能影響依賴該共享的服務（noexec 會使放在 NFS 上的程式無法執行）",
+    "needs_reboot": false,
+    "applies_when": "/etc/fstab 有 NFS 掛載",
+    "existing": false,
+    "notes": "文件的 `grep nfs /etc/fstab` 也會比對到註解與含 nfs 字樣的路徑，實作需依欄位判斷。autofs 管理的 NFS 掛載不在 fstab 中，需另查 /etc/auto.* 的選項。"
+  },
+  {
+    "key": "sticky_bit_world_writable",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0029",
+      "rhel9": "TWGCB-01-012-0029"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "設定全域寫入權限目錄之粘滯位",
+    "expected": "設定粘滯位",
+    "doc_method": "#df --local -P | awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -type d \\( -perm -0002 -a ! -perm -1000 \\) 2>/dev/null | xargs -I '{}' chmod o+t '{}'",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "所有本機檔案系統中，other 可寫的目錄必須有 sticky bit"
+    },
+    "check": "列出本機檔案系統掛載點（`df --local -P` 或 /proc/self/mountinfo 排除 nfs、cifs、proc、sysfs 等），在每個掛載點內不跨檔案系統（比對 st_dev）走訪目錄，找出 mode & 0o002 且未設 0o1000 的目錄；有任何一個即不符合並列出清單。",
+    "fix": "對清單中每個目錄記錄原 mode 後執行 chmod o+t。回滾：依記錄對新增 sticky 的目錄執行 chmod o-t。",
+    "risk": "A",
+    "risk_reason": "只新增 sticky bit，不影響既有讀寫",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "大型檔案系統走訪可能很久，建議設逾時並顯示進度。文件指令遇到含空白的掛載點會出錯。"
+  },
+  {
+    "key": "autofs_disabled",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0030",
+      "rhel9": "TWGCB-01-012-0030"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "autofs 服務",
+    "expected": "停用",
+    "doc_method": "#systemctl --now disable autofs",
+    "version_diff": "",
+    "type": "service_disabled",
+    "params": {
+      "units": [
+        "autofs.service"
+      ]
+    },
+    "check": "未安裝 autofs（`rpm -q autofs` 失敗）即符合；已安裝則 `systemctl is-enabled autofs` 不可為 enabled，且 `systemctl is-active autofs` 須為 inactive。",
+    "fix": "記錄原 enabled/active 狀態後執行 `systemctl --now disable autofs`。回滾：依記錄 `systemctl enable --now autofs`。",
+    "risk": "B",
+    "risk_reason": "停用後自動掛載的 NFS 家目錄或共享會消失，可能影響登入與服務",
+    "needs_reboot": false,
+    "applies_when": "已安裝 autofs",
+    "existing": false,
+    "notes": "企業環境常以 autofs 掛載 NFS 家目錄，執行前應確認 /etc/auto.master 是否有實際用途。"
+  },
+  {
+    "key": "usb_storage",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0031",
+      "rhel9": "TWGCB-01-012-0031"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "USB 儲存裝置",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/usb-storage.conf，內容：install usb-storage /bin/true、blacklist usb-storage；執行 #rmmod usb-storage；完成後重新開機",
+    "version_diff": "",
+    "type": "module_disabled",
+    "params": {
+      "module": "usb-storage"
+    },
+    "check": "1) `modprobe -n -v usb-storage` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist usb-storage`；3) `lsmod`（/proc/modules）中不得出現 usb-storage。若 `modinfo usb-storage` 找不到模組且核心未內建（/proc/filesystems 無 usb-storage），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/usb-storage.conf（若有）；寫入 /etc/modprobe.d/usb-storage.conf，內容 `install usb-storage /bin/true` 與 `blacklist usb-storage`；若模組已載入且未使用則執行 `modprobe -r usb-storage`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "伺服器通常不需 USB 儲存，停用模組影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "模組名稱 usb-storage 與 usb_storage 在 modprobe 中等價，檢查 lsmod 時要比對 usb_storage。文件 rmmod 指令缺少 # 提示符號。若 USB 隨身碟正在掛載使用則 rmmod 會失敗，需重開機。"
+  },
+  {
+    "key": "dnf_gpgcheck",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0032",
+      "rhel9": "TWGCB-01-012-0032"
+    },
+    "category": "系統設定與維護",
+    "title": "GPG 簽章驗證",
+    "expected": "1",
+    "doc_method": "編輯 /etc/yum.conf 與 /etc/dnf/dnf.conf 的 [main] 段落：gpgcheck=1、localpkg_gpgcheck=1；編輯 /etc/yum.repos.d 下所有檔案，將所有 gpgcheck 設為 gpgcheck=1",
+    "version_diff": "RHEL 8 文件只要求編輯 /etc/yum.conf，RHEL 9 另列 /etc/dnf/dnf.conf；RHEL 8 文件在 repo 檔也要求加 localpkg_gpgcheck=1，RHEL 9 repo 檔只要求 gpgcheck=1（RHEL 9 表格末尾的 localpkg_gpgcheck=1 位置模糊）。",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/dnf/dnf.conf",
+      "section": "main",
+      "keys": {
+        "gpgcheck": "1",
+        "localpkg_gpgcheck": "1"
+      },
+      "compare": "eq",
+      "separator": "=",
+      "repo_glob": "/etc/yum.repos.d/*.repo",
+      "repo_keys": {
+        "gpgcheck": "1"
+      }
+    },
+    "check": "解析 /etc/dnf/dnf.conf（/etc/yum.conf 在 RHEL 8/9 為指向它的符號連結，若是獨立檔案也要檢查）的 [main]：gpgcheck 與 localpkg_gpgcheck 須為 1（也接受 True/yes）；/etc/yum.repos.d/*.repo 中每個 repo 段落若有 gpgcheck 須為 1，未設定時沿用 [main] 的值。",
+    "fix": "備份 dnf.conf 與所有 .repo 檔；以 configparser 方式修改 [main] 的 gpgcheck=1、localpkg_gpgcheck=1，並把各 repo 的 gpgcheck=0 改為 1（不在 repo 檔加 localpkg_gpgcheck，它是 [main] 專用選項）。回滾：還原備份檔。",
+    "risk": "A",
+    "risk_reason": "只改套件管理設定檔",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0032 與 RHEL 9 TWGCB-01-012-0032，r2 分組不輸出此編號。 文件說明欄寫 /etc/yum/repos.d/，設定方法寫 /etc/yum.repos.d，正確為 /etc/yum.repos.d。localpkg_gpgcheck=1 會使安裝本機未簽章 RPM（含自行打包的工具）失敗。"
+  },
+  {
+    "key": "sudo_installed",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0033",
+      "rhel9": "TWGCB-01-012-0033"
+    },
+    "category": "系統設定與維護",
+    "title": "sudo 套件",
+    "expected": "安裝",
+    "doc_method": "#dnf install sudo",
+    "version_diff": "",
+    "type": "package_present",
+    "params": {
+      "pkg": "sudo"
+    },
+    "check": "`rpm -q sudo` 成功即符合。",
+    "fix": "`dnf -y install sudo`（需可用的套件庫）；記錄是否由工具安裝。回滾：僅在由工具安裝時 `dnf -y remove sudo`。",
+    "risk": "A",
+    "risk_reason": "安裝套件不影響現有設定",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0033 與 RHEL 9 TWGCB-01-012-0033，r2 分組不輸出此編號。 RHEL 8/9 最小安裝通常已含 sudo；離線環境需事先準備套件庫。"
+  },
+  {
+    "key": "sudo_use_pty",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0034",
+      "rhel9": "TWGCB-01-012-0034"
+    },
+    "category": "系統設定與維護",
+    "title": "設定 sudo 指令使用 pty",
+    "expected": "Defaults use_pty",
+    "doc_method": "以 visudo -f 編輯 /etc/sudoers 或 /etc/sudoers.d/ 下檔案，新增：Defaults use_pty",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "sudoers 中須有 Defaults use_pty",
+      "files": [
+        "/etc/sudoers",
+        "/etc/sudoers.d/*"
+      ],
+      "line": "Defaults use_pty"
+    },
+    "check": "解析 /etc/sudoers 及其 #includedir／@includedir 指向的檔案（略過註解與含 ~ 或 . 的檔名），須有 `Defaults` 列含 use_pty 且沒有 `!use_pty`。",
+    "fix": "寫入 /etc/sudoers.d/gcb_use_pty（權限 0440、root:root），內容 `Defaults use_pty`，先以 `visudo -cf` 驗證，失敗則不寫入。回滾：刪除該檔案。",
+    "risk": "A",
+    "risk_reason": "以 drop-in 加入並先驗證語法，不影響現有授權",
+    "needs_reboot": false,
+    "applies_when": "已安裝 sudo",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0034 與 RHEL 9 TWGCB-01-012-0034，r2 分組不輸出此編號。"
+  },
+  {
+    "key": "sudo_logfile",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0035",
+      "rhel9": "TWGCB-01-012-0035"
+    },
+    "category": "系統設定與維護",
+    "title": "sudo 自定義日誌檔案",
+    "expected": "啟用",
+    "doc_method": "以 visudo -f 編輯 /etc/sudoers 或 /etc/sudoers.d/ 下檔案，新增：Defaults logfile=\"(日誌檔案路徑)\"，例如 Defaults logfile=\"/var/log/sudo.log\"",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "sudoers 中須有 Defaults logfile=",
+      "files": [
+        "/etc/sudoers",
+        "/etc/sudoers.d/*"
+      ],
+      "line": "Defaults logfile=\"/var/log/sudo.log\""
+    },
+    "check": "解析 sudoers 與 includedir 檔案，須有 `Defaults` 列設定 logfile=（任意路徑皆可）。",
+    "fix": "寫入 /etc/sudoers.d/gcb_logfile（0440、root:root），內容 `Defaults logfile=\"/var/log/sudo.log\"`，以 `visudo -cf` 驗證。回滾：刪除該檔案。",
+    "risk": "A",
+    "risk_reason": "以 drop-in 加入並先驗證語法",
+    "needs_reboot": false,
+    "applies_when": "已安裝 sudo",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0035 與 RHEL 9 TWGCB-01-012-0035，r2 分組不輸出此編號。 日誌路徑由使用者決定，文件只給範例；新的日誌檔應納入 logrotate。"
+  },
+  {
+    "key": "aide_installed",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0036",
+      "rhel9": "TWGCB-01-012-0036"
+    },
+    "category": "系統設定與維護",
+    "title": "AIDE 套件",
+    "expected": "安裝",
+    "doc_method": "#dnf install aide；#aide --init；#mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz",
+    "version_diff": "",
+    "type": "package_present",
+    "params": {
+      "pkg": "aide",
+      "db": "/var/lib/aide/aide.db.gz"
+    },
+    "check": "`rpm -q aide` 成功，且 /var/lib/aide/aide.db.gz 存在（未初始化視為不符合）。",
+    "fix": "`dnf -y install aide`，再執行 `aide --init`（可能數分鐘到數十分鐘），完成後把 /var/lib/aide/aide.db.new.gz 移為 aide.db.gz（已有舊資料庫時先備份）。回滾：還原舊資料庫；若套件由工具安裝則移除套件並刪除新資料庫。",
+    "risk": "B",
+    "risk_reason": "初始化資料庫需掃描整個系統、耗時很久",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0036 與 RHEL 9 TWGCB-01-012-0036，r2 分組不輸出此編號。 資料庫路徑以 /etc/aide.conf 的 database_out／DBDIR 為準。"
+  },
+  {
+    "key": "aide_cron",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0037",
+      "rhel9": "TWGCB-01-012-0037"
+    },
+    "category": "系統設定與維護",
+    "title": "定期檢查檔案系統完整性",
+    "expected": "每天",
+    "doc_method": "#crontab -u root -e，新增：0 5 * * * /usr/sbin/aide --check",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "排程每天執行 aide --check",
+      "cron_line": "0 5 * * * /usr/sbin/aide --check"
+    },
+    "check": "在 `crontab -u root -l`、/etc/crontab、/etc/cron.d/*、/etc/cron.daily/* 中找到執行 aide --check（或 aide -C）的排程，或有已啟用的 systemd timer（如 aidecheck.timer）執行它，即符合。",
+    "fix": "寫入 /etc/cron.d/gcb-aide，內容 `0 5 * * * root /usr/sbin/aide --check`（權限 0644），不改 root 個人 crontab。回滾：刪除該檔案。",
+    "risk": "A",
+    "risk_reason": "只新增排程檔",
+    "needs_reboot": false,
+    "applies_when": "已安裝 aide 且已初始化",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0037 與 RHEL 9 TWGCB-01-012-0037，r2 分組不輸出此編號。 文件使用 root crontab；改用 /etc/cron.d 較易管理與回滾，兩者效果相同。"
+  },
+  {
+    "key": "grub_cfg_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0038",
+      "rhel9": "TWGCB-01-012-0038"
+    },
+    "category": "系統設定與維護",
+    "title": "開機載入程式設定檔之所有權",
+    "expected": "root:root",
+    "doc_method": "BIOS：#chown root:root /boot/grub2/grub.cfg、#chown root:root /boot/grub2/grubenv、#[ -f /boot/grub2/user.cfg ] && chown root:root /boot/grub2/user.cfg；UEFI：在 /etc/fstab 的 /boot/efi 列第 4 欄加入 uid=0,gid=0，例如 <device> /boot/efi vfat umask=0027,shortname=winnt,uid=0,gid=0 0 2",
+    "version_diff": "說明文字不同：RHEL 8 寫「GNU GRUB」，RHEL 9 寫「GRUB」；設定內容相同。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/boot/grub2/grub.cfg",
+        "/boot/grub2/grubenv",
+        "/boot/grub2/user.cfg",
+        "/boot/efi/EFI/*/grub.cfg",
+        "/boot/efi/EFI/*/grubenv",
+        "/boot/efi/EFI/*/user.cfg"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ],
+      "recursive": false
+    },
+    "check": "對存在的檔案（跟隨符號連結）以 stat 檢查 uid=0、gid=0。UEFI（/sys/firmware/efi 存在）時 /boot/efi 下的檔案由掛載選項決定，`findmnt -kn -o OPTIONS /boot/efi` 中若有 uid=／gid= 必須為 0（未指定時預設即為 root）。",
+    "fix": "BIOS 路徑：記錄原擁有者後 `chown root:root`。UEFI：vfat 無法 chown，若掛載選項 uid/gid 不是 0 才需備份 /etc/fstab、改為 uid=0,gid=0 並 `mount -o remount /boot/efi`；一般 RHEL 預設已符合。回滾：依記錄 chown 或還原 fstab 並 remount。",
+    "risk": "A",
+    "risk_reason": "BIOS 只改檔案擁有者；UEFI 預設已符合",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0038 與 RHEL 9 TWGCB-01-012-0038，r2 分組不輸出此編號。 文件「uid=0, and gid=0」是照抄英文說法，實際寫法為 uid=0,gid=0。RHEL 8 UEFI 的 grub.cfg 在 /boot/efi/EFI/redhat/（Rocky 為 EFI/rocky、Alma 為 EFI/almalinux）；RHEL 9 起實際 grub.cfg 在 /boot/grub2，EFI 目錄下只是轉址用的 stub。"
+  },
+  {
+    "key": "grub_cfg_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0039",
+      "rhel9": "TWGCB-01-012-0039"
+    },
+    "category": "系統設定與維護",
+    "title": "開機載入程式設定檔之權限",
+    "expected": "600 或更低權限",
+    "doc_method": "BIOS：#chmod 600 /boot/grub2/grub.cfg、#chmod 600 /boot/grub2/grubenv、#[ -f /boot/grub2/user.cfg ] && chmod 600 /boot/grub2/user.cfg；UEFI：在 /etc/fstab 的 /boot/efi 列第 4 欄加入 fmask=0177，例如 <device> /boot/efi vfat umask=0027,shortname=winnt,fmask=0177 0 2",
+    "version_diff": "說明文字不同：RHEL 8 寫「GNU GRUB」，RHEL 9 寫「GRUB」；設定內容相同。",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/boot/grub2/grub.cfg",
+        "/boot/grub2/grubenv",
+        "/boot/grub2/user.cfg",
+        "/boot/efi/EFI/*/grub.cfg",
+        "/boot/efi/EFI/*/grubenv",
+        "/boot/efi/EFI/*/user.cfg"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ],
+      "max_mode": "0600",
+      "recursive": false
+    },
+    "check": "對存在的檔案（跟隨符號連結）檢查 mode & 0o177 == 0。UEFI 時 /boot/efi 下檔案的權限由掛載選項決定：fmask 須包含 0177（或 umask 讓檔案權限不超過 0600）。",
+    "fix": "BIOS 路徑：記錄原權限後 `chmod 600`。UEFI：備份 /etc/fstab，在 /boot/efi 列加入 fmask=0177，`systemctl daemon-reload` 後 `mount -o remount /boot/efi`。回滾：依記錄 chmod，或還原 fstab 並 remount。",
+    "risk": "B",
+    "risk_reason": "UEFI 系統需修改 /boot/efi 的 fstab 掛載選項，錯誤時可能影響開機",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0039 與 RHEL 9 TWGCB-01-012-0039，r2 分組不輸出此編號。 RHEL 安裝程式預設 /boot/efi 為 umask=0077,shortname=winnt，檔案權限為 0700（含執行位），會不符合，需加 fmask=0177。grub2-mkconfig 或核心更新重建 grub.cfg 後權限可能改變，修復後應重新檢測。"
+  },
+  {
+    "key": "grub_password",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0040",
+      "rhel9": "TWGCB-01-012-0040"
+    },
+    "category": "系統設定與維護",
+    "title": "開機載入程式之通行碼",
+    "expected": {
+      "rhel8": "設定密碼",
+      "rhel9": "設定通行碼"
+    },
+    "doc_method": "#grub2-setpassword（輸入並確認通行碼）；#grub2-mkconfig -o \"$(dirname \"$(find /boot -type f \\( -name 'grubenv' -o -name 'grub.conf' -o -name 'grub.cfg' \\) -exec grep -Pl '^\\h*(kernelopts=|linux|kernel)' {} \\;)\")/grub.cfg\"",
+    "version_diff": "僅用詞不同：RHEL 8 標題為「開機載入程式之密碼」、設定值「設定密碼」，RHEL 9 改為「通行碼」；指令相同。",
+    "type": "custom",
+    "params": {
+      "description": "user.cfg 中須有 GRUB2_PASSWORD=grub.pbkdf2.sha512...",
+      "files": [
+        "/boot/grub2/user.cfg",
+        "/boot/efi/EFI/*/user.cfg"
+      ]
+    },
+    "check": "在 /boot/grub2/user.cfg（RHEL 8 UEFI 為 /boot/efi/EFI/<vendor>/user.cfg）找到以 `GRUB2_PASSWORD=grub.pbkdf2.sha512.` 開頭的列即符合；並確認 grub.cfg 含 01_users 段落（`password_pbkdf2 root ${GRUB2_PASSWORD}`）。",
+    "fix": "不自動修復（需要使用者設定的通行碼），提示管理員執行 `grub2-setpassword`。若要回滾，刪除（或還原）user.cfg。",
+    "risk": "C",
+    "risk_reason": "需由管理員設定並保管通行碼",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0040 與 RHEL 9 TWGCB-01-012-0040，r2 分組不輸出此編號。 grub2-setpassword 寫入 user.cfg 後，RHEL 8/9 的 grub.cfg 已透過 01_users 讀取，通常不必重跑 grub2-mkconfig；文件的 find 指令在 RHEL 8 UEFI 可能找到多個檔案而失敗。"
+  },
+  {
+    "key": "single_user_auth",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0041",
+      "rhel9": "TWGCB-01-012-0041"
+    },
+    "category": "系統設定與維護",
+    "title": "單一使用者模式身分鑑別",
+    "expected": "啟用",
+    "doc_method": "編輯 /usr/lib/systemd/system/rescue.service：ExecStart=-/usr/lib/systemd/systemd-sulogin-shell rescue；編輯 /usr/lib/systemd/system/emergency.service：ExecStart=-/usr/lib/systemd/systemd-sulogin-shell emergency",
+    "version_diff": "僅用詞不同：RHEL 8 標題為「單一使用者模式身分驗證」，RHEL 9 改為「身分鑑別」；設定相同。",
+    "type": "custom",
+    "params": {
+      "description": "rescue/emergency.service 的 ExecStart 須使用 systemd-sulogin-shell",
+      "units": {
+        "rescue.service": "ExecStart=-/usr/lib/systemd/systemd-sulogin-shell rescue",
+        "emergency.service": "ExecStart=-/usr/lib/systemd/systemd-sulogin-shell emergency"
+      }
+    },
+    "check": "以 `systemctl cat rescue.service emergency.service`（含 drop-in）取得最終生效的 ExecStart，須呼叫 /usr/lib/systemd/systemd-sulogin-shell（或 /usr/sbin/sulogin）。RHEL 8/9 預設即符合。",
+    "fix": "不改 /usr/lib 下的套件檔，改寫 drop-in /etc/systemd/system/rescue.service.d/gcb.conf 與 emergency.service.d/gcb.conf：先寫 `ExecStart=` 清空，再寫文件指定的 ExecStart；`systemctl daemon-reload`。回滾：刪除 drop-in 並 daemon-reload。",
+    "risk": "B",
+    "risk_reason": "影響救援模式登入；root 無密碼或被鎖定時會無法進入救援模式",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0041 與 RHEL 9 TWGCB-01-012-0041，r2 分組不輸出此編號。 文件直接編輯 /usr/lib/systemd/system 的檔案，套件更新會覆蓋，應使用 drop-in。root 帳號被鎖定時，sulogin 會拒絕進入救援模式。"
+  },
+  {
+    "key": "core_dump_disabled",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0042",
+      "rhel9": "TWGCB-01-012-0042"
+    },
+    "category": "系統設定與維護",
+    "title": "核心傾印功能",
+    "expected": "停用",
+    "doc_method": "limits.conf 或 /etc/security/limits.d/ 加入：* hard core 0；/etc/sysctl.conf 或 /etc/sysctl.d/ 設定 fs.suid_dumpable = 0、kernel.core_pattern = |/bin/false；#sysctl -w fs.suid_dumpable=0、#sysctl -w kernel.core_pattern=|/bin/false；若已安裝 coredump 服務，編輯 /etc/systemd/coredump.conf：Storage=none、ProcessSizeMax=0，#systemctl daemon-reload，#systemctl mask systemd-coredump.socket",
+    "version_diff": "",
+    "type": "custom",
+    "params": {
+      "description": "組合規則：limits、sysctl、coredump.conf、遮蔽 socket",
+      "limits": "* hard core 0",
+      "sysctl": [
+        "fs.suid_dumpable = 0",
+        "kernel.core_pattern = |/bin/false"
+      ],
+      "coredump_conf": {
+        "Storage": "none",
+        "ProcessSizeMax": "0"
+      },
+      "mask": [
+        "systemd-coredump.socket"
+      ]
+    },
+    "check": "1) /etc/security/limits.conf 與 limits.d/*.conf 有 `* hard core 0`；2) `sysctl -n fs.suid_dumpable` 為 0、`sysctl -n kernel.core_pattern` 為 |/bin/false，且持久設定（/etc/sysctl.conf、/etc/sysctl.d、/usr/lib/sysctl.d 依檔名排序最後生效者）一致；3) systemd-coredump 存在時，`systemd-analyze cat-config systemd/coredump.conf` 最終 Storage=none、ProcessSizeMax=0；4) `systemctl is-enabled systemd-coredump.socket` 為 masked。",
+    "fix": "備份並寫入：/etc/security/limits.d/99-gcb-coredump.conf（`* hard core 0`）、/etc/sysctl.d/99-gcb-coredump.conf（兩個參數）並 `sysctl --system` 套用、/etc/systemd/coredump.conf.d/gcb.conf（[Coredump] Storage=none、ProcessSizeMax=0）、`systemctl daemon-reload`、`systemctl mask systemd-coredump.socket`。回滾：刪除這些 drop-in、`systemctl unmask systemd-coredump.socket`、還原 sysctl 原值。",
+    "risk": "A",
+    "risk_reason": "只寫設定檔與核心參數，不影響一般服務",
+    "needs_reboot": false,
+    "applies_when": "一律（coredump 相關步驟在有 systemd-coredump 時）",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0042 與 RHEL 9 TWGCB-01-012-0042，r2 分組不輸出此編號。 文件的 `sysctl -w kernel.core_pattern=|/bin/false` 未加引號，在 shell 中 | 會被當成管線，應寫成 sysctl -w 'kernel.core_pattern=|/bin/false'。systemd-coredump 由 /usr/lib/sysctl.d/50-coredump.conf 設定 core_pattern，/etc/sysctl.d 的設定檔名必須排在其後。安裝 abrt 時 abrt-ccpp 也會改 core_pattern。limits 只影響 PAM 登入的工作階段，systemd 服務需另設 DefaultLimitCORE。"
+  },
+  {
+    "key": "aslr",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0043",
+      "rhel9": "TWGCB-01-012-0043"
+    },
+    "category": "系統設定與維護",
+    "title": "記憶體位址空間配置隨機載入",
+    "expected": "2",
+    "doc_method": "/etc/sysctl.conf 或 /etc/sysctl.d/ 設定 kernel.randomize_va_space = 2；#sysctl -w kernel.randomize_va_space=2",
+    "version_diff": "",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        "kernel.randomize_va_space = 2"
+      ]
+    },
+    "check": "`sysctl -n kernel.randomize_va_space` 為 2，且持久設定（sysctl.d 依序最後生效者）也為 2。",
+    "fix": "記錄原值，寫入 /etc/sysctl.d/99-gcb-aslr.conf 並 `sysctl -w kernel.randomize_va_space=2`。回滾：刪除檔案並以 sysctl -w 還原原值。",
+    "risk": "A",
+    "risk_reason": "RHEL 預設即為 2，只寫設定檔",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0043 與 RHEL 9 TWGCB-01-012-0043，r2 分組不輸出此編號。"
+  },
+  {
+    "key": "crypto_policy",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0044",
+      "rhel9": "TWGCB-01-012-0044"
+    },
+    "category": "系統設定與維護",
+    "title": "設定全系統加密原則",
+    "expected": "FUTURE 或 FIPS",
+    "doc_method": "#grep -E -i '^\\s*(FUTURE|FIPS)\\s*(\\s+#.*)?$' /etc/crypto-policies/config 檢查；若不是，(1) #update-crypto-policies --set FUTURE，再執行 #update-crypto-policies；或 (2) #fips-mode-setup --enable 並重新開機",
+    "version_diff": "兩版文件內容相同。實務上 RHEL 9 的 fips-mode-setup 已不建議使用（官方建議在安裝時啟用 FIPS），且 RHEL 9 DEFAULT 已不允許 SHA-1 簽章。",
+    "type": "custom",
+    "params": {
+      "description": "全系統加密原則須為 FUTURE 或 FIPS",
+      "allowed": [
+        "FUTURE",
+        "FIPS"
+      ]
+    },
+    "check": "`update-crypto-policies --show` 的主要原則（冒號前，例如 FUTURE:AD-SUPPORT 取 FUTURE）須為 FUTURE 或 FIPS；FIPS 時另確認 `fips-mode-setup --check` 或 /proc/sys/crypto/fips_enabled 為 1。",
+    "fix": "記錄原原則（`update-crypto-policies --show`），執行 `update-crypto-policies --set FUTURE`，標示需重開機（或重啟所有使用加密的服務）。不自動啟用 FIPS。回滾：`update-crypto-policies --set <原原則>` 後重開機。",
+    "risk": "B",
+    "risk_reason": "FUTURE 要求 3072 位元以上 RSA 並禁用 SHA-1，可能讓 SSH、TLS 連線及 2048 位元憑證失效",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0044 與 RHEL 9 TWGCB-01-012-0044，r2 分組不輸出此編號。 文件的 grep 只接受單一原則字串，帶子原則（如 FUTURE:AD-SUPPORT）會被誤判為不符合。修改前應確認 SSH 金鑰、伺服器憑證、AD/Kerberos、對外連線的對方是否支援。"
+  },
+  {
+    "key": "passwd_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0045",
+      "rhel9": "TWGCB-01-012-0045"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/passwd 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "#chown root:root /etc/passwd",
+    "version_diff": "",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/passwd"
+      ],
+      "owner": "root",
+      "groups": [
+        "root"
+      ]
+    },
+    "check": "stat /etc/passwd，uid=0 且 gid=0。",
+    "fix": "記錄原擁有者後 `chown root:root /etc/passwd`。回滾：依記錄 chown。",
+    "risk": "A",
+    "risk_reason": "只改檔案擁有者",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": true,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0045 與 RHEL 9 TWGCB-01-012-0045，r2 分組不輸出此編號。"
+  },
+  {
+    "key": "passwd_perm",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0046",
+      "rhel9": "TWGCB-01-012-0046"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/passwd 檔案權限",
+    "expected": "644 或更低權限",
+    "doc_method": "#chmod 644 /etc/passwd",
+    "version_diff": "",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/passwd"
+      ],
+      "max_mode": "0644"
+    },
+    "check": "stat /etc/passwd，mode & 0o133 == 0（不超過 0644）。",
+    "fix": "記錄原權限後 `chmod 644 /etc/passwd`（已更嚴格則不動）。回滾：依記錄 chmod。",
+    "risk": "A",
+    "risk_reason": "只改檔案權限",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": true,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0046 與 RHEL 9 TWGCB-01-012-0046，r2 分組不輸出此編號。"
+  },
+  {
+    "key": "shadow_owner",
+    "ids": {
+      "rhel8": "TWGCB-01-008-0047",
+      "rhel9": "TWGCB-01-012-0047"
+    },
+    "category": "系統設定與維護",
+    "title": "/etc/shadow 檔案所有權",
+    "expected": "root:root 或 root:shadow",
+    "doc_method": "#chown root:root /etc/shadow 或 #chown root:shadow /etc/shadow",
+    "version_diff": "",
+    "type": "file_perm",
+    "params": {
+      "paths": [
+        "/etc/shadow"
+      ],
+      "owner": "root",
+      "groups": [
+        "root",
+        "shadow"
+      ]
+    },
+    "check": "stat /etc/shadow，uid=0 且所屬群組為 root 或 shadow。",
+    "fix": "記錄原擁有者後 `chown root:root /etc/shadow`。回滾：依記錄 chown。",
+    "risk": "A",
+    "risk_reason": "只改檔案擁有者",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": true,
+    "notes": "【編號歸屬】類別為「系統設定與維護」，依分組更正 v2 由 r1_disk 負責 RHEL 8 TWGCB-01-008-0047 與 RHEL 9 TWGCB-01-012-0047，r2 分組不輸出此編號。 RHEL 預設沒有 shadow 群組，/etc/shadow 為 root:root、權限 0000；root:shadow 是 Debian 系的慣例。"
+  },
+  {
+    "key": "freevxfs",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0285"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "freevxfs 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/freevxfs.conf，內容：install freevxfs /bin/true、blacklist freevxfs；執行 #modprobe -r freevxfs、#rmmod freevxfs；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "freevxfs"
+    },
+    "check": "1) `modprobe -n -v freevxfs` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist freevxfs`；3) `lsmod`（/proc/modules）中不得出現 freevxfs。若 `modinfo freevxfs` 找不到模組且核心未內建（/proc/filesystems 無 freevxfs），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/freevxfs.conf（若有）；寫入 /etc/modprobe.d/freevxfs.conf，內容 `install freevxfs /bin/true` 與 `blacklist freevxfs`；若模組已載入且未使用則執行 `modprobe -r freevxfs`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "模組不存在時（`modinfo` 失敗且 /proc/filesystems 無此項）直接判定符合，RHEL 9 核心不一定有提供此模組。"
+  },
+  {
+    "key": "hfs",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0286"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "hfs 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/hfs.conf，內容：install hfs /bin/true、blacklist hfs；執行 #modprobe -r hfs、#rmmod hfs；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "hfs"
+    },
+    "check": "1) `modprobe -n -v hfs` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist hfs`；3) `lsmod`（/proc/modules）中不得出現 hfs。若 `modinfo hfs` 找不到模組且核心未內建（/proc/filesystems 無 hfs），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/hfs.conf（若有）；寫入 /etc/modprobe.d/hfs.conf，內容 `install hfs /bin/true` 與 `blacklist hfs`；若模組已載入且未使用則執行 `modprobe -r hfs`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "模組不存在時（`modinfo` 失敗且 /proc/filesystems 無此項）直接判定符合，RHEL 9 核心不一定有提供此模組。"
+  },
+  {
+    "key": "hfsplus",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0287"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "hfs plus 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/hfsplus.conf，內容：install hfsplus /bin/true、blacklist hfsplus；執行 #modprobe -r hfsplus、#rmmod hfsplus；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "hfsplus"
+    },
+    "check": "1) `modprobe -n -v hfsplus` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist hfsplus`；3) `lsmod`（/proc/modules）中不得出現 hfsplus。若 `modinfo hfsplus` 找不到模組且核心未內建（/proc/filesystems 無 hfsplus），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/hfsplus.conf（若有）；寫入 /etc/modprobe.d/hfsplus.conf，內容 `install hfsplus /bin/true` 與 `blacklist hfsplus`；若模組已載入且未使用則執行 `modprobe -r hfsplus`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "模組不存在時（`modinfo` 失敗且 /proc/filesystems 無此項）直接判定符合，RHEL 9 核心不一定有提供此模組。標題寫「hfs plus」，模組名稱為 hfsplus。"
+  },
+  {
+    "key": "jffs2",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0288"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "jffs2 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/jffs2.conf，內容：install jffs2 /bin/true、blacklist jffs2；執行 #modprobe -r jffs2、#rmmod jffs2；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "jffs2"
+    },
+    "check": "1) `modprobe -n -v jffs2` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist jffs2`；3) `lsmod`（/proc/modules）中不得出現 jffs2。若 `modinfo jffs2` 找不到模組且核心未內建（/proc/filesystems 無 jffs2），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/jffs2.conf（若有）；寫入 /etc/modprobe.d/jffs2.conf，內容 `install jffs2 /bin/true` 與 `blacklist jffs2`；若模組已載入且未使用則執行 `modprobe -r jffs2`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "模組不存在時（`modinfo` 失敗且 /proc/filesystems 無此項）直接判定符合，RHEL 9 核心不一定有提供此模組。"
+  },
+  {
+    "key": "afs",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0289"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "afs 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/afs.conf，內容：install afs /bin/true、blacklist afs；執行 #modprobe -r afs、#rmmod afs；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "afs"
+    },
+    "check": "1) `modprobe -n -v afs` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist afs`；3) `lsmod`（/proc/modules）中不得出現 afs。若 `modinfo afs` 找不到模組且核心未內建（/proc/filesystems 無 afs），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/afs.conf（若有）；寫入 /etc/modprobe.d/afs.conf，內容 `install afs /bin/true` 與 `blacklist afs`；若模組已載入且未使用則執行 `modprobe -r afs`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "模組不存在時（`modinfo` 失敗且 /proc/filesystems 無此項）直接判定符合，RHEL 9 核心不一定有提供此模組。Linux 的 AFS 用戶端模組名稱為 kafs（別名 afs）；OpenAFS 的 openafs 模組不受影響。"
+  },
+  {
+    "key": "ceph",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0290"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "ceph 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/ceph.conf，內容：install ceph /bin/true、blacklist ceph；執行 #modprobe -r ceph、#rmmod ceph；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "ceph"
+    },
+    "check": "1) `modprobe -n -v ceph` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist ceph`；3) `lsmod`（/proc/modules）中不得出現 ceph。若 `modinfo ceph` 找不到模組且核心未內建（/proc/filesystems 無 ceph），視為符合。；另檢查使用中：`lsmod` 是否已載入、/proc/self/mountinfo 與 /etc/fstab 是否有對應檔案系統類型的掛載、相依服務是否在執行（ceph 類型掛載）。",
+    "fix": "先執行使用中檢查（見 check），使用中則不修復、只回報。備份既有 /etc/modprobe.d/ceph.conf（若有）；寫入 /etc/modprobe.d/ceph.conf，內容 `install ceph /bin/true` 與 `blacklist ceph`；若模組已載入且未使用則執行 `modprobe -r ceph`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "B",
+    "risk_reason": "若主機是 CephFS 用戶端，停用後無法掛載",
+    "needs_reboot": false,
+    "applies_when": "未使用 CephFS（fstab／掛載中沒有 ceph 類型）",
+    "existing": false,
+    "notes": "模組不存在時（`modinfo` 失敗且 /proc/filesystems 無此項）直接判定符合，RHEL 9 核心不一定有提供此模組。RBD 區塊裝置使用 rbd 模組，與 ceph 檔案系統模組不同，但 rbd 相依 libceph。"
+  },
+  {
+    "key": "cifs",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0291"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "cifs 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/cifs.conf，內容：install cifs /bin/true、blacklist cifs；執行 #modprobe -r cifs、#rmmod cifs；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "cifs"
+    },
+    "check": "1) `modprobe -n -v cifs` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist cifs`；3) `lsmod`（/proc/modules）中不得出現 cifs。若 `modinfo cifs` 找不到模組且核心未內建（/proc/filesystems 無 cifs），視為符合。；另檢查使用中：`lsmod` 是否已載入、/proc/self/mountinfo 與 /etc/fstab 是否有對應檔案系統類型的掛載、相依服務是否在執行（cifs、smb3 類型掛載，或 autofs 對應中的 cifs）。",
+    "fix": "先執行使用中檢查（見 check），使用中則不修復、只回報。備份既有 /etc/modprobe.d/cifs.conf（若有）；寫入 /etc/modprobe.d/cifs.conf，內容 `install cifs /bin/true` 與 `blacklist cifs`；若模組已載入且未使用則執行 `modprobe -r cifs`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "B",
+    "risk_reason": "停用後無法掛載 Windows/SMB 共享",
+    "needs_reboot": false,
+    "applies_when": "未掛載 SMB/CIFS 共享",
+    "existing": false,
+    "notes": "與 smbfs_common（0300）相關，兩者應同時評估。"
+  },
+  {
+    "key": "exfat",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0292"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "exfat 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/exfat.conf，內容：install exfat /bin/true、blacklist exfat；執行 #modprobe -r exfat、#rmmod exfat；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "exfat"
+    },
+    "check": "1) `modprobe -n -v exfat` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist exfat`；3) `lsmod`（/proc/modules）中不得出現 exfat。若 `modinfo exfat` 找不到模組且核心未內建（/proc/filesystems 無 exfat），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/exfat.conf（若有）；寫入 /etc/modprobe.d/exfat.conf，內容 `install exfat /bin/true` 與 `blacklist exfat`；若模組已載入且未使用則執行 `modprobe -r exfat`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "模組不存在時（`modinfo` 失敗且 /proc/filesystems 無此項）直接判定符合，RHEL 9 核心不一定有提供此模組。停用後無法讀取 exFAT 格式的 USB 隨身碟或 SD 卡。"
+  },
+  {
+    "key": "ext_module",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0293"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "ext 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/ext.conf，內容：install ext /bin/true、blacklist ext；執行 #modprobe -r ext、#rmmod ext；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "ext"
+    },
+    "check": "1) `modprobe -n -v ext` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist ext`；3) `lsmod`（/proc/modules）中不得出現 ext。若 `modinfo ext` 找不到模組且核心未內建（/proc/filesystems 無 ext），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/ext.conf（若有）；寫入 /etc/modprobe.d/ext.conf，內容 `install ext /bin/true` 與 `blacklist ext`；若模組已載入且未使用則執行 `modprobe -r ext`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "Linux 核心沒有名為 ext 的模組（實際為 ext4，ext2/ext3 也由 ext4 提供），照文件寫入 install ext /bin/true 不會有實際效果；實作時絕不可擴大解釋為停用 ext4，否則以 ext4 為根或 /boot 的系統（Rocky/Alma 常見）將無法開機。此條應視為文件照抄 CIS 稽核清單的錯誤，檢查只看 ext 本身，modinfo ext 找不到時判定符合。"
+  },
+  {
+    "key": "fat",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0294"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "fat 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/fat.conf，內容：install fat /bin/true、blacklist fat；執行 #modprobe -r fat、#rmmod fat；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "fat"
+    },
+    "check": "1) `modprobe -n -v fat` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist fat`；3) `lsmod`（/proc/modules）中不得出現 fat。若 `modinfo fat` 找不到模組且核心未內建（/proc/filesystems 無 fat），視為符合。；另檢查使用中：`lsmod` 是否已載入、/proc/self/mountinfo 與 /etc/fstab 是否有對應檔案系統類型的掛載、相依服務是否在執行（vfat、msdos、fat 類型）；UEFI 系統（/sys/firmware/efi 存在）一律判定為不適用，不可修復。",
+    "fix": "先執行使用中檢查（見 check），使用中則不修復、只回報。備份既有 /etc/modprobe.d/fat.conf（若有）；寫入 /etc/modprobe.d/fat.conf，內容 `install fat /bin/true` 與 `blacklist fat`；若模組已載入且未使用則執行 `modprobe -r fat`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "B",
+    "risk_reason": "UEFI 系統的 /boot/efi 為 vfat，停用 fat 會導致掛載失敗、開機進入緊急模式",
+    "needs_reboot": false,
+    "applies_when": "非 UEFI 開機（/sys/firmware/efi 不存在）且 fstab 與掛載中沒有 vfat/msdos/fat 類型",
+    "existing": false,
+    "notes": "vfat 與 msdos 模組都相依 fat；RHEL 8/9 UEFI 安裝預設 /boot/efi 為 vfat，套用此規則會使下次開機 /boot/efi 掛載失敗。文件未提及此風險。"
+  },
+  {
+    "key": "fscache",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0295"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "fscache 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/fscache.conf，內容：install fscache /bin/true、blacklist fscache；執行 #modprobe -r fscache、#rmmod fscache；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "fscache"
+    },
+    "check": "1) `modprobe -n -v fscache` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist fscache`；3) `lsmod`（/proc/modules）中不得出現 fscache。若 `modinfo fscache` 找不到模組且核心未內建（/proc/filesystems 無 fscache），視為符合。；另檢查使用中：`lsmod` 是否已載入、/proc/self/mountinfo 與 /etc/fstab 是否有對應檔案系統類型的掛載、相依服務是否在執行（nfs/nfs4 掛載、cachefilesd 服務、`modinfo -F depends nfs` 是否含 fscache）。",
+    "fix": "先執行使用中檢查（見 check），使用中則不修復、只回報。備份既有 /etc/modprobe.d/fscache.conf（若有）；寫入 /etc/modprobe.d/fscache.conf，內容 `install fscache /bin/true` 與 `blacklist fscache`；若模組已載入且未使用則執行 `modprobe -r fscache`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "B",
+    "risk_reason": "RHEL 9 的 nfs 模組相依 fscache／netfs，停用可能使 NFS 用戶端無法載入",
+    "needs_reboot": false,
+    "applies_when": "未使用 NFS 用戶端與 cachefilesd",
+    "existing": false,
+    "notes": "文件稱 fscache 為「檔案系統」，實際是快取框架。若 nfs 相依 fscache，此規則與 NFS 掛載選項規則（0026–0028）互相衝突，使用 NFS 的主機應排除。"
+  },
+  {
+    "key": "fuse",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0296"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "fuse 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/fuse.conf，內容：install fuse /bin/true、blacklist fuse；執行 #modprobe -r fuse、#rmmod fuse；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "fuse"
+    },
+    "check": "1) `modprobe -n -v fuse` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist fuse`；3) `lsmod`（/proc/modules）中不得出現 fuse。若 `modinfo fuse` 找不到模組且核心未內建（/proc/filesystems 無 fuse），視為符合。；另檢查使用中：`lsmod` 是否已載入、/proc/self/mountinfo 與 /etc/fstab 是否有對應檔案系統類型的掛載、相依服務是否在執行（fuse.* 類型掛載、已安裝 fuse-overlayfs／sshfs 等套件）。",
+    "fix": "先執行使用中檢查（見 check），使用中則不修復、只回報。備份既有 /etc/modprobe.d/fuse.conf（若有）；寫入 /etc/modprobe.d/fuse.conf，內容 `install fuse /bin/true` 與 `blacklist fuse`；若模組已載入且未使用則執行 `modprobe -r fuse`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "B",
+    "risk_reason": "podman rootless（fuse-overlayfs）、sshfs、gvfs、部分備份及雲端儲存代理程式依賴 fuse",
+    "needs_reboot": false,
+    "applies_when": "未使用 FUSE 相關套件與掛載",
+    "existing": false,
+    "notes": "RHEL 9 的 fuse 可能內建於核心（非模組），此時無法用 modprobe 停用，應判定為不適用並說明。"
+  },
+  {
+    "key": "gfs2",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0297"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "gfs2 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/gfs2.conf，內容：install gfs2 /bin/true、blacklist gfs2；執行 #modprobe -r gfs2、#rmmod gfs2；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "gfs2"
+    },
+    "check": "1) `modprobe -n -v gfs2` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist gfs2`；3) `lsmod`（/proc/modules）中不得出現 gfs2。若 `modinfo gfs2` 找不到模組且核心未內建（/proc/filesystems 無 gfs2），視為符合。；另檢查使用中：`lsmod` 是否已載入、/proc/self/mountinfo 與 /etc/fstab 是否有對應檔案系統類型的掛載、相依服務是否在執行（gfs2 類型掛載、pacemaker/dlm 服務）。",
+    "fix": "先執行使用中檢查（見 check），使用中則不修復、只回報。備份既有 /etc/modprobe.d/gfs2.conf（若有）；寫入 /etc/modprobe.d/gfs2.conf，內容 `install gfs2 /bin/true` 與 `blacklist gfs2`；若模組已載入且未使用則執行 `modprobe -r gfs2`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "B",
+    "risk_reason": "停用後 Red Hat 高可用性叢集的共享儲存無法掛載",
+    "needs_reboot": false,
+    "applies_when": "未使用 GFS2 叢集檔案系統",
+    "existing": false,
+    "notes": "gfs2 屬 Resilient Storage 附加元件，一般主機通常沒有此模組。"
+  },
+  {
+    "key": "nfs_common",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0298"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "nfs_common 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/nfs_common.conf，內容：install nfs_common /bin/true、blacklist nfs_common；執行 #modprobe -r nfs_common、#rmmod nfs_common；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "nfs_common"
+    },
+    "check": "1) `modprobe -n -v nfs_common` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist nfs_common`；3) `lsmod`（/proc/modules）中不得出現 nfs_common。若 `modinfo nfs_common` 找不到模組且核心未內建（/proc/filesystems 無 nfs_common），視為符合。",
+    "fix": "備份既有 /etc/modprobe.d/nfs_common.conf（若有）；寫入 /etc/modprobe.d/nfs_common.conf，內容 `install nfs_common /bin/true` 與 `blacklist nfs_common`；若模組已載入且未使用則執行 `modprobe -r nfs_common`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "A",
+    "risk_reason": "寫 modprobe 設定檔停用不需要的核心模組，影響低",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "existing": false,
+    "notes": "nfs-common 是 Debian/Ubuntu 的套件名稱，不是 RHEL 的核心模組（RHEL 對應的是 nfs、nfsv3、nfsv4、lockd、sunrpc 等）。照文件寫入不會影響 NFS，modinfo 找不到時判定符合。文件應是照抄 CIS 清單的錯誤；若真要停用 NFS 用戶端，會與 0026–0028 衝突。"
+  },
+  {
+    "key": "nfsd",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0299"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "nfsd 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/nfsd.conf，內容：install nfsd /bin/true、blacklist nfsd；執行 #modprobe -r nfsd、#rmmod nfsd；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "nfsd"
+    },
+    "check": "1) `modprobe -n -v nfsd` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist nfsd`；3) `lsmod`（/proc/modules）中不得出現 nfsd。若 `modinfo nfsd` 找不到模組且核心未內建（/proc/filesystems 無 nfsd），視為符合。；另檢查使用中：`lsmod` 是否已載入、/proc/self/mountinfo 與 /etc/fstab 是否有對應檔案系統類型的掛載、相依服務是否在執行（nfs-server.service 是否啟用、/etc/exports 與 /etc/exports.d 是否有內容）。",
+    "fix": "先執行使用中檢查（見 check），使用中則不修復、只回報。備份既有 /etc/modprobe.d/nfsd.conf（若有）；寫入 /etc/modprobe.d/nfsd.conf，內容 `install nfsd /bin/true` 與 `blacklist nfsd`；若模組已載入且未使用則執行 `modprobe -r nfsd`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "B",
+    "risk_reason": "停用後主機無法提供 NFS 伺服器服務",
+    "needs_reboot": false,
+    "applies_when": "主機不是 NFS 伺服器（nfs-server 未啟用、/etc/exports 無匯出）",
+    "existing": false,
+    "notes": "與 r3／服務類規則中停用 nfs-server 的項目一致時可一併處理。"
+  },
+  {
+    "key": "smbfs_common",
+    "ids": {
+      "rhel8": null,
+      "rhel9": "TWGCB-01-012-0300"
+    },
+    "category": "磁碟與檔案系統",
+    "title": "smbfs_common 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增 /etc/modprobe.d/smbfs_common.conf，內容：install smbfs_common /bin/true、blacklist smbfs_common；執行 #modprobe -r smbfs_common、#rmmod smbfs_common；完成後重新開機",
+    "version_diff": "僅 RHEL 9 有此規則（RHEL 9 v1.2 新增），RHEL 8 無對應項目。",
+    "type": "module_disabled",
+    "params": {
+      "module": "smbfs_common"
+    },
+    "check": "1) `modprobe -n -v smbfs_common` 輸出須為 `install /bin/true`（或 /bin/false）；2) `modprobe --showconfig` 中須有 `blacklist smbfs_common`；3) `lsmod`（/proc/modules）中不得出現 smbfs_common。若 `modinfo smbfs_common` 找不到模組且核心未內建（/proc/filesystems 無 smbfs_common），視為符合。；另檢查使用中：`lsmod` 是否已載入、/proc/self/mountinfo 與 /etc/fstab 是否有對應檔案系統類型的掛載、相依服務是否在執行（cifs/smb3 類型掛載）。",
+    "fix": "先執行使用中檢查（見 check），使用中則不修復、只回報。備份既有 /etc/modprobe.d/smbfs_common.conf（若有）；寫入 /etc/modprobe.d/smbfs_common.conf，內容 `install smbfs_common /bin/true` 與 `blacklist smbfs_common`；若模組已載入且未使用則執行 `modprobe -r smbfs_common`（等同 rmmod），使用中則標示需重開機。回滾：還原或刪除該 conf 檔。",
+    "risk": "B",
+    "risk_reason": "cifs 相依 smbfs_common，停用後無法掛載 SMB 共享",
+    "needs_reboot": false,
+    "applies_when": "未掛載 SMB/CIFS 共享",
+    "existing": false,
+    "notes": "模組不存在時（`modinfo` 失敗且 /proc/filesystems 無此項）直接判定符合，RHEL 9 核心不一定有提供此模組。文件路徑因 PDF 斷行為「smbfs_common.co nf」，正確為 /etc/modprobe.d/smbfs_common.conf。"
+  }
+]

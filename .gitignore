@@ -1,0 +1,17 @@
+# 執行產生的報告與備份（含主機資訊、系統設定檔備份，不可提交）
+reports/
+vm-reports/
+tests/out/
+
+# Python
+__pycache__/
+*.pyc
+
+# 編輯器與系統檔
+.idea/
+.vscode/
+.DS_Store
+
+# GCB 官方文件（智慧財產權屬數位發展部資通安全署，請自行下載，見 docs/gcb/README.md）
+docs/gcb/**/*.pdf
+docs/gcb/**/chunks.json

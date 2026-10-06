@@ -1,0 +1,512 @@
+[
+  {
+    "id": "TWGCB-01-014-0133",
+    "category": "日誌與稽核",
+    "title": "記錄變更系統強制存取控制事件",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-w /etc/apparmor/ -p wa -k MAC-policy ｜ -w /etc/apparmor.d/ -p wa -k MAC-policy；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /etc/apparmor/ -p wa -k MAC-policy",
+        "-w /etc/apparmor.d/ -p wa -k MAC-policy"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0133.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0133.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。PDF 斷行把 key 拆成「MAC- policy」，正確為 MAC-policy。"
+  },
+  {
+    "id": "TWGCB-01-014-0134",
+    "category": "日誌與稽核",
+    "title": "記錄變更系統網路環境事件",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F arch=b64 -S sethostname,setdomainname -k system-locale ｜ -a always,exit -F arch=b32 -S sethostname,setdomainname -k system-locale ｜ -w /etc/issue -p wa -k system-locale ｜ -w /etc/issue.net -p wa -k system-locale ｜ -w /etc/hosts -p wa -k system-locale ｜ -w /etc/networks -p wa -k system-locale ｜ -w /etc/network/ -p wa -k system-locale；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b64 -S sethostname,setdomainname -k system-locale",
+        "-a always,exit -F arch=b32 -S sethostname,setdomainname -k system-locale",
+        "-w /etc/issue -p wa -k system-locale",
+        "-w /etc/issue.net -p wa -k system-locale",
+        "-w /etc/hosts -p wa -k system-locale",
+        "-w /etc/networks -p wa -k system-locale",
+        "-w /etc/network/ -p wa -k system-locale"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0134.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0134.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。PDF 斷行把 key 拆成「system- locale」，正確為 system-locale。Ubuntu 22.04 預設使用 netplan，/etc/network/ 目錄可能不存在；監看不存在的目錄 auditctl 會報錯，修復時若目錄不存在應先略過該行（並在報告中註明）或改監看 /etc/netplan/（後者非文件要求）。"
+  },
+  {
+    "id": "TWGCB-01-014-0135",
+    "category": "日誌與稽核",
+    "title": "記錄變更自主存取控制權限事件",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -k perm_mod ｜ -a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -k perm_mod ｜ -a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=unset -k perm_mod ｜ -a always,exit -F arch=b32 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=unset -k perm_mod ｜ -a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -k perm_mod ｜ -a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -k perm_mod；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -k perm_mod",
+        "-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -k perm_mod",
+        "-a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=unset -k perm_mod",
+        "-a always,exit -F arch=b32 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=unset -k perm_mod",
+        "-a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -k perm_mod",
+        "-a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -k perm_mod"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0135.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0135.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。UID 門檻 auid>=1000 宜改讀 /etc/login.defs 的 UID_MIN（Ubuntu 預設 1000）。PDF 斷行把 removexattr 拆成「removexat tr」，已還原。"
+  },
+  {
+    "id": "TWGCB-01-014-0136",
+    "category": "日誌與稽核",
+    "title": "記錄不成功之未經授權檔案存取",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access ｜ -a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access ｜ -a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access ｜ -a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access",
+        "-a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access",
+        "-a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access",
+        "-a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0136.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0136.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。PDF 中 EACCES 規則的「- F auid!=unset」為斷行造成，正確為「-F auid!=unset」。說明把 EPERM 解釋為「系統呼叫參數錯誤」不精確（實為操作不被允許），不影響規則。auditctl -l 會將 exit=-EACCES 顯示為 exit=-EACCES 或數值 -13，比對時需容忍。"
+  },
+  {
+    "id": "TWGCB-01-014-0137",
+    "category": "日誌與稽核",
+    "title": "記錄變更使用者或群組資訊事件",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-w /etc/group -p wa -k identity ｜ -w /etc/passwd -p wa -k identity ｜ -w /etc/gshadow -p wa -k identity ｜ -w /etc/shadow -p wa -k identity ｜ -w /etc/security/opasswd -p wa -k identity；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /etc/group -p wa -k identity",
+        "-w /etc/passwd -p wa -k identity",
+        "-w /etc/gshadow -p wa -k identity",
+        "-w /etc/shadow -p wa -k identity",
+        "-w /etc/security/opasswd -p wa -k identity"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0137.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0137.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。/etc/security/opasswd 在 Ubuntu 22.04 預設可能不存在（未啟用 pam_pwhistory 前）；檔案不存在但父目錄存在時 auditctl 仍可加入監看。"
+  },
+  {
+    "id": "TWGCB-01-014-0138",
+    "category": "日誌與稽核",
+    "title": "記錄變更檔案系統掛載事件",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=unset -k mounts ｜ -a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=unset -k mounts；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=unset -k mounts",
+        "-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=unset -k mounts"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0138.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0138.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。說明提到監控 mount 與 umount，但設定內容只有 mount 系統呼叫；依 GCB 設定值只檢 mount，umount2 不列入。"
+  },
+  {
+    "id": "TWGCB-01-014-0139",
+    "category": "日誌與稽核",
+    "title": "記錄特權指令使用情形",
+    "expected": "啟用",
+    "doc_method": "對系統每個磁區執行 #find (partition) -xdev \\( -perm -4000 -o -perm -2000 \\) -type f | awk '{print \"-a always,exit -F path=\" $1 \" -F perm=x -F auid>=1000 -F auid!=unset -k privileged\" }'；以根磁區為例：#find / -xdev \\( -perm -4000 -o -perm -2000 \\) -type f | awk '{print \"-a always,exit -F path=\" $1 \" -F perm=x -F auid>=1000 -F auid!=unset -k privileged\" }' >> /etc/audit/rules.d/privileged.rules；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "custom",
+    "params": {
+      "rule_template": "-a always,exit -F path={path} -F perm=x -F auid>=1000 -F auid!=unset -k privileged",
+      "find_cmd": "find {mountpoint} -xdev \\( -perm -4000 -o -perm -2000 \\) -type f",
+      "file": "/etc/audit/rules.d/50-gcb-0139-privileged.rules"
+    },
+    "check": "列出本機實體檔案系統掛載點（讀 /proc/self/mounts 或 findmnt -n -l -o TARGET,FSTYPE，排除 proc/sysfs/tmpfs/devtmpfs/cgroup*/squashfs/overlay/nfs 等虛擬或網路 FS，以及 nosuid/noexec 掛載點可視情況排除），對每個掛載點以 os.walk 不跨 FS（比對 st_dev）找出 mode & 0o6000 的一般檔案；每個路徑都須在 rules.d 彙整內容與 auditctl -l 中有對應的 -a always,exit -F path=<路徑> -F perm=x -F auid>=1000 -F auid!=unset -k privileged 規則（auditctl -l 顯示 key 為 -F key=privileged、auid!=-1）。全部涵蓋才合格。",
+    "fix": "依掃描結果產生規則，寫入獨立檔案 /etc/audit/rules.d/50-gcb-0139-privileged.rules（每次修復重新產生整份，排序去重），權限 0640，再執行 augenrules --load。回滾＝刪除該檔並 augenrules --load；若檔案原已存在則先備份。若 enabled 2 則需重開機生效。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，可刪檔回滾；但規則數量依系統而異，套件更新新增 setuid 程式後需重新產生。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "文件要求寫入 privileged.rules，並以 >> 附加，重複執行會產生重複規則；本工具改為整份重新產生。path 含空白時 awk $1 會截斷（文件寫法缺陷）。Ubuntu 22.04 的 snap 掛載（/snap/*，squashfs 唯讀）內含 setuid 檔，find 依掛載點逐一執行時會掃到，應排除 squashfs。此規則為動態清單，安裝或移除套件後檢測可能變為不合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0140",
+    "category": "日誌與稽核",
+    "title": "記錄檔案刪除事件",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F arch=b64 -S rename,unlink,unlinkat,renameat,rmdir -F auid>=1000 -F auid!=unset -k delete ｜ -a always,exit -F arch=b32 -S rename,unlink,unlinkat,renameat,rmdir -F auid>=1000 -F auid!=unset -k delete；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b64 -S rename,unlink,unlinkat,renameat,rmdir -F auid>=1000 -F auid!=unset -k delete",
+        "-a always,exit -F arch=b32 -S rename,unlink,unlinkat,renameat,rmdir -F auid>=1000 -F auid!=unset -k delete"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0140.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0140.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。PDF 斷行把 rmdir 拆成「r mdir」，已還原。系統呼叫清單未含 renameat2（新版 coreutils mv 會使用），屬文件涵蓋不足，依原文不加入。"
+  },
+  {
+    "id": "TWGCB-01-014-0141",
+    "category": "日誌與稽核",
+    "title": "記錄核心模組掛載、卸載及修改事件",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F arch=b64 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules ｜ -a always,exit -F arch=b32 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b64 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules",
+        "-a always,exit -F arch=b32 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0141.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0141.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。PDF 斷行把 delete_module 拆成「delete_m odule」，已還原。create_module/query_module 在現代核心已不存在，auditd 的 syscall 表仍有名稱可解析，但若 auditctl 回報 unknown syscall，需視為文件問題。加上 auid>=1000 後 root 透過 systemd 自動載入模組不會被記錄。"
+  },
+  {
+    "id": "TWGCB-01-014-0142",
+    "category": "日誌與稽核",
+    "title": "記錄系統管理者活動日誌變更",
+    "expected": "啟用",
+    "doc_method": "#grep -r logfile /etc/sudoers* | sed -e 's/.*logfile=//;s/,? .*//' 找出 sudo 日誌路徑；#vim /etc/audit/rules.d/actions.rules 加入：-w (sudo 日誌檔案路徑) -p wa -k sudo_log_file；以預設路徑為例：-w /var/log/sudo.log -p wa -k sudo_log_file；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /var/log/sudo.log -p wa -k sudo_log_file"
+      ],
+      "rule_template": "-w {sudo_logfile} -p wa -k sudo_log_file",
+      "sudo_logfile_source": "/etc/sudoers 與 /etc/sudoers.d/* 中 Defaults logfile=... 的值；找不到時用 /var/log/sudo.log",
+      "file": "/etc/audit/rules.d/50-gcb-0142.rules"
+    },
+    "check": "先解析 /etc/sudoers、/etc/sudoers.d/*（略過註解）中的 logfile= 值（可能帶引號），取得路徑；未設定則用 /var/log/sudo.log。rules.d 彙整內容與 auditctl -l 都須有 -w <路徑> -p wa -k sudo_log_file 才合格。",
+    "fix": "以實際路徑產生規則，寫入 /etc/audit/rules.d/50-gcb-0142.rules，執行 augenrules --load；回滾＝刪檔後 augenrules --load。",
+    "risk": "A",
+    "risk_reason": "僅新增一條檔案監看規則，可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（且已安裝 sudo）",
+    "notes": "文件稱 /var/log/sudo.log 為系統預設路徑，但 Ubuntu 22.04 預設不設定 sudo logfile（記錄進 syslog/journal），該檔通常不存在；/var/log 存在時 auditctl 仍可監看不存在的檔案。是否要另行設定 Defaults logfile 不在此規則範圍。文件的 sed 指令在 BRE 下「,?」的 ? 為字面字元，應為 sed -E 's/.*logfile=//;s/,? .*//'，本工具以 Python 自行解析。文件建議檔名 actions.rules，本工具用 drop-in。"
+  },
+  {
+    "id": "TWGCB-01-014-0143",
+    "category": "日誌與稽核",
+    "title": "記錄 setfacl 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0143.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0143.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。setfacl 屬 acl 套件；若 /usr/bin/setfacl 不存在，auditctl 加入 path 規則可能失敗，修復前應檢查檔案存在，不存在則回報不適用或略過。"
+  },
+  {
+    "id": "TWGCB-01-014-0144",
+    "category": "日誌與稽核",
+    "title": "記錄 usermod 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=unset -k usermod；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/usr/sbin/usermod -F perm=x -F auid>=1000 -F auid!=unset -k usermod"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0144.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0144.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。"
+  },
+  {
+    "id": "TWGCB-01-014-0145",
+    "category": "日誌與稽核",
+    "title": "記錄 chacl 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0145.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0145.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。chacl 屬 acl 套件；若 /usr/bin/chacl 不存在應略過或回報不適用。"
+  },
+  {
+    "id": "TWGCB-01-014-0146",
+    "category": "日誌與稽核",
+    "title": "記錄 kmod 指令使用情形",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F path=/usr/bin/kmod -F perm=x -F auid>=1000 -F auid!=unset -k kernel_modules；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F path=/usr/bin/kmod -F perm=x -F auid>=1000 -F auid!=unset -k kernel_modules"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0146.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0146.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。說明未提 auid 條件，但設定內容有 -F auid>=1000 -F auid!=unset，依設定內容實作。Ubuntu 22.04 的 /sbin/modprobe 等為指向 /bin/kmod 的符號連結，/usr/bin/kmod 為實體檔。"
+  },
+  {
+    "id": "TWGCB-01-014-0147",
+    "category": "日誌與稽核",
+    "title": "記錄 execve 系統呼叫使用情形",
+    "expected": "啟用",
+    "doc_method": "#vim /etc/audit/rules.d/audit.rules，加入：-a always,exit -F arch=b32 -F auid!=unset -S execve -C uid!=euid -k user_emulation ｜ -a always,exit -F arch=b64 -F auid!=unset -S execve -C uid!=euid -k user_emulation ｜ -a always,exit -F arch=b32 -F auid!=unset -S execve -C gid!=egid -k user_emulation ｜ -a always,exit -F arch=b64 -F auid!=unset -S execve -C gid!=egid -k user_emulation；執行 #augenrules --load 載入；執行 #auditctl -s | grep enabled，若輸出 enabled 2 表示組態已鎖定，需重新開機才能載入。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b32 -F auid!=unset -S execve -C uid!=euid -k user_emulation",
+        "-a always,exit -F arch=b64 -F auid!=unset -S execve -C uid!=euid -k user_emulation",
+        "-a always,exit -F arch=b32 -F auid!=unset -S execve -C gid!=egid -k user_emulation",
+        "-a always,exit -F arch=b64 -F auid!=unset -S execve -C gid!=egid -k user_emulation"
+      ],
+      "file": "/etc/audit/rules.d/50-gcb-0147.rules"
+    },
+    "check": "兩處皆須合格：(1) 開機後生效：彙整 /etc/audit/rules.d/*.rules 所有非註解行（去除多餘空白），每條規則行皆須存在；(2) 目前生效：執行 auditctl -l，每條規則須出現。比對前需正規化：auditctl -l 會把 syscall 規則的 -k X 顯示為 -F key=X、auid!=unset 顯示為 auid!=-1（或 4294967295）、-S 清單順序可能不同、-p wa 可能顯示為 -p wa；建議以 (動作, arch, syscall 集合, 欄位集合, key) 做集合比對。全部找到才算合格。",
+    "fix": "新增獨立檔案 /etc/audit/rules.d/50-gcb-0147.rules（內容為 params.rules 全部規則行），權限 0640 root:root；寫入前可逐行以 auditctl 測試語法（避免 auditctl -R 遇錯中斷後續規則載入）；接著執行 augenrules --load。備份：新檔案無需備份原內容，回滾＝刪除該檔後再執行 augenrules --load；若 augenrules 會改寫 /etc/audit/audit.rules，先備份 /etc/audit/audit.rules。若 auditctl -s 顯示 enabled 2，載入會失敗，規則需重開機才生效，應回報『已寫入、待重開機』。",
+    "risk": "A",
+    "risk_reason": "僅新增稽核規則，不影響服務運作且可刪檔回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd（套件 auditd）",
+    "notes": "文件建議寫入 /etc/audit/rules.d/audit.rules，本工具改用獨立 drop-in 檔以利回滾。規則主要記錄以不同身分（uid!=euid，如 sudo）執行程式的情形，標題「execve 使用情形」不完整。auditctl -l 會把 -C uid!=euid 顯示為 -C uid!=euid、欄位順序可能重排，比對需正規化。"
+  },
+  {
+    "id": "TWGCB-01-014-0148",
+    "category": "日誌與稽核",
+    "title": "auditd 設定不變模式",
+    "expected": "2",
+    "doc_method": "在 /etc/audit/rules.d/ 目錄中最後被執行的「.rules」檔案的最後一行加入：-e 2；以 #grep -h \"^\\s*[^#]\" /etc/audit/rules.d/*.rules | egrep \"-e 2\" 驗證，輸出含「-e 2」即完成。",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-e 2"
+      ],
+      "file": "/etc/audit/rules.d/99-finalize.rules",
+      "position": "last_line_of_last_file"
+    },
+    "check": "依檔名排序（augenrules 的排序）取 /etc/audit/rules.d/*.rules，彙整非註解行後，最後一條有效行須為「-e 2」才算開機後生效合格；另以 auditctl -s 檢查 enabled 2（目前生效）。若 rules.d 已設定但 enabled 仍非 2，回報『待重開機』。",
+    "fix": "寫入 /etc/audit/rules.d/99-finalize.rules（若已存在則先備份，並移除其中其他 -e 行後於檔尾附加 -e 2）；確認沒有排序更後面的 .rules 檔，以及其他檔案中沒有 -e 0/-e 1 出現在其後。執行 augenrules --load（載入後即鎖定）。回滾：還原/刪除該檔並重開機，鎖定期間無法以指令解除。",
+    "risk": "B",
+    "risk_reason": "啟用後稽核規則鎖定，之後任何稽核規則修改或回滾都必須重開機。",
+    "needs_reboot": true,
+    "applies_when": "已安裝 auditd",
+    "notes": "應排在所有其他稽核規則修復之後執行，否則本次其他規則載入會失敗。文件的驗證指令 egrep \"-e 2\" 會被 grep 解讀成選項 -e 加上模式「 2」，等於找含「 2」的任何行（例如 --backlog_wait_time 2000 之類含「 2」的行都會誤判），結果不可靠，應改為 grep -E '^\\s*-e\\s+2\\s*$'。GCB 設定值欄 PDF 抽出為「2」。Ubuntu 22.04 auditd 套件預設未提供 99-finalize.rules。"
+  },
+  {
+    "id": "TWGCB-01-014-0149",
+    "category": "日誌與稽核",
+    "title": "rsyslog 套件",
+    "expected": "安裝",
+    "doc_method": "#apt install rsyslog",
+    "type": "package_present",
+    "params": {
+      "pkg": "rsyslog"
+    },
+    "check": "dpkg-query -W -f='${Status}' rsyslog 輸出為 install ok installed 即合格。",
+    "fix": "apt-get install -y rsyslog（需可連線套件庫）；回滾＝apt-get remove rsyslog（僅在原本未安裝時）。記錄修復前未安裝的狀態以利回滾。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 22.04 伺服器預設即安裝，安裝本身不影響既有服務。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "需網路或本機套件來源；離線環境安裝會失敗，應回報而非視為工具錯誤。"
+  },
+  {
+    "id": "TWGCB-01-014-0150",
+    "category": "日誌與稽核",
+    "title": "rsyslog 服務",
+    "expected": "啟用",
+    "doc_method": "#systemctl --now enable rsyslog",
+    "type": "service_enabled",
+    "params": {
+      "unit": "rsyslog.service",
+      "pkg": "rsyslog"
+    },
+    "check": "systemctl is-enabled rsyslog 為 enabled 且 systemctl is-active rsyslog 為 active 即合格。",
+    "fix": "systemctl --now enable rsyslog；備份：記錄原 is-enabled/is-active 狀態，回滾時依原狀態 disable/stop。",
+    "risk": "A",
+    "risk_reason": "啟用日誌服務不影響其他服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 rsyslog",
+    "notes": "已實作。"
+  },
+  {
+    "id": "TWGCB-01-014-0151",
+    "category": "日誌與稽核",
+    "title": "設定 rsyslog 日誌檔案預設權限",
+    "expected": "0640 或更低權限",
+    "doc_method": "編輯 /etc/rsyslog.conf 與 /etc/rsyslog.d/ 目錄下的「.conf」檔案，設定參數 $FileCreateMode 為 0640 或更低權限，例如：$FileCreateMode 0640",
+    "type": "kv_config",
+    "params": {
+      "path": [
+        "/etc/rsyslog.conf",
+        "/etc/rsyslog.d/*.conf"
+      ],
+      "key": "$FileCreateMode",
+      "value": "0640",
+      "compare": "le",
+      "compare_note": "以八進位權限位元比較：mode & ~0o640 == 0（不得多出 0640 以外的位元），不是單純數值大小比較",
+      "separator": " "
+    },
+    "check": "讀 /etc/rsyslog.conf 及 /etc/rsyslog.d/*.conf（依 $IncludeConfig 載入順序），找所有未註解的 $FileCreateMode 行；至少須有一行，且每一行的值（八進位）都滿足 mode & ~0o640 == 0 才合格。另可檢查 RainerScript 形式 module(load=\"builtin:omfile\" fileCreateMode=\"...\") 或 action(... fileCreateMode=...) 的值。",
+    "fix": "備份 /etc/rsyslog.conf 及要修改的 /etc/rsyslog.d/*.conf；把不合格的 $FileCreateMode 行改為 $FileCreateMode 0640；若完全沒有設定，在 /etc/rsyslog.conf 的 $IncludeConfig 之前加入 $FileCreateMode 0640（或新增 /etc/rsyslog.d/00-gcb-filecreatemode.conf，檔名需排在 50-default.conf 之前）。以 rsyslogd -N1 驗證語法後 systemctl restart rsyslog；回滾＝還原備份並重啟 rsyslog。",
+    "risk": "A",
+    "risk_reason": "只影響新建日誌檔的權限，重啟 rsyslog 不中斷其他服務。",
+    "needs_reboot": false,
+    "applies_when": "使用 rsyslog（已安裝 rsyslog）",
+    "notes": "「0640 或更低權限」應解讀為權限位元不超過 0640（例如 0600、0440 合格），而非八進位數值較小（0577 數值較小但權限較寬）。$FileCreateMode 為舊式指令，只影響其後定義的動作，放置位置有順序性。Ubuntu 22.04 預設 /etc/rsyslog.conf 已有 $FileCreateMode 0640，通常預設合格。只影響新建檔案，既有日誌檔權限不會改變。"
+  },
+  {
+    "id": "TWGCB-01-014-0152",
+    "category": "日誌與稽核",
+    "title": "設定 journald 將日誌發送到 rsyslog",
+    "expected": "yes",
+    "doc_method": "編輯 /etc/systemd/journald.conf，新增：ForwardToSyslog=yes；執行 #systemctl restart rsyslog",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/systemd/journald.conf",
+      "dropin_dirs": [
+        "/etc/systemd/journald.conf.d",
+        "/run/systemd/journald.conf.d",
+        "/usr/lib/systemd/journald.conf.d"
+      ],
+      "section": "Journal",
+      "key": "ForwardToSyslog",
+      "value": "yes",
+      "compare": "eq",
+      "separator": "="
+    },
+    "check": "依 systemd 規則求有效值：先讀 /etc/systemd/journald.conf 的 [Journal] 區段，再依檔名排序讀 /usr/lib、/run、/etc 下 journald.conf.d/*.conf（同檔名以 /etc 優先），後讀者覆蓋前者；有效的 ForwardToSyslog 須明確設定且值為 yes（不分大小寫）才合格。",
+    "fix": "新增 /etc/systemd/journald.conf.d/60-gcb-journald.conf（若已存在先備份），於 [Journal] 區段寫入 ForwardToSyslog=yes（與其他 journald 規則共用此檔時合併），確認沒有排序更後的 drop-in 覆蓋；執行 systemctl restart systemd-journald。回滾＝刪除或還原該檔並重啟 systemd-journald。",
+    "risk": "A",
+    "risk_reason": "僅調整 journald 設定，重啟 journald 不影響其他服務運作。",
+    "needs_reboot": false,
+    "applies_when": "使用 rsyslog（已安裝並啟用 rsyslog）",
+    "notes": "文件要求重啟 rsyslog，但 ForwardToSyslog 為 journald 設定，需重啟 systemd-journald 才生效（可再重啟 rsyslog）。Ubuntu 22.04 編譯預設已是 ForwardToSyslog=yes（設定檔內為註解），檢測是否要求明確設定為政策選擇，本規格採明確設定。適用前提為使用 rsyslog。"
+  },
+  {
+    "id": "TWGCB-01-014-0153",
+    "category": "日誌與稽核",
+    "title": "設定 journald 壓縮日誌檔案",
+    "expected": "yes",
+    "doc_method": "編輯 /etc/systemd/journald.conf，新增：Compress=yes；執行 #systemctl restart systemd-journald",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/systemd/journald.conf",
+      "dropin_dirs": [
+        "/etc/systemd/journald.conf.d",
+        "/run/systemd/journald.conf.d",
+        "/usr/lib/systemd/journald.conf.d"
+      ],
+      "section": "Journal",
+      "key": "Compress",
+      "value": "yes",
+      "compare": "eq",
+      "separator": "="
+    },
+    "check": "依 systemd 規則求有效值：先讀 /etc/systemd/journald.conf 的 [Journal] 區段，再依檔名排序讀 /usr/lib、/run、/etc 下 journald.conf.d/*.conf（同檔名以 /etc 優先），後讀者覆蓋前者；有效的 Compress 須明確設定且值為 yes（不分大小寫）才合格。",
+    "fix": "新增 /etc/systemd/journald.conf.d/60-gcb-journald.conf（若已存在先備份），於 [Journal] 區段寫入 Compress=yes（與其他 journald 規則共用此檔時合併），確認沒有排序更後的 drop-in 覆蓋；執行 systemctl restart systemd-journald。回滾＝刪除或還原該檔並重啟 systemd-journald。",
+    "risk": "A",
+    "risk_reason": "僅調整 journald 設定，重啟 journald 不影響其他服務運作。",
+    "needs_reboot": false,
+    "applies_when": "一律（systemd-journald）",
+    "notes": "systemd 預設 Compress=yes（設定檔內為註解），本規格要求明確設定。"
+  },
+  {
+    "id": "TWGCB-01-014-0154",
+    "category": "日誌與稽核",
+    "title": "設定 journald 將日誌檔案永久保存於磁碟",
+    "expected": "persistent",
+    "doc_method": "編輯 /etc/systemd/journald.conf，新增：Storage=persistent；執行 #systemctl restart systemd-journald",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/systemd/journald.conf",
+      "dropin_dirs": [
+        "/etc/systemd/journald.conf.d",
+        "/run/systemd/journald.conf.d",
+        "/usr/lib/systemd/journald.conf.d"
+      ],
+      "section": "Journal",
+      "key": "Storage",
+      "value": "persistent",
+      "compare": "eq",
+      "separator": "="
+    },
+    "check": "依 systemd 規則求有效值：先讀 /etc/systemd/journald.conf 的 [Journal] 區段，再依檔名排序讀 /usr/lib、/run、/etc 下 journald.conf.d/*.conf（同檔名以 /etc 優先），後讀者覆蓋前者；有效的 Storage 須明確設定且值為 persistent（不分大小寫）才合格。",
+    "fix": "新增 /etc/systemd/journald.conf.d/60-gcb-journald.conf（若已存在先備份），於 [Journal] 區段寫入 Storage=persistent（與其他 journald 規則共用此檔時合併），確認沒有排序更後的 drop-in 覆蓋；執行 systemctl restart systemd-journald。回滾＝刪除或還原該檔並重啟 systemd-journald。",
+    "risk": "A",
+    "risk_reason": "僅調整 journald 設定，重啟 journald 不影響其他服務運作。",
+    "needs_reboot": false,
+    "applies_when": "一律（systemd-journald）",
+    "notes": "systemd 預設 Storage=auto，若 /var/log/journal 存在（Ubuntu 22.04 預設存在）即等同永久保存，但仍須明確設定 persistent。會增加 /var/log 磁碟用量，建議搭配 SystemMaxUse 限制（文件未要求）。PDF 有錯字「磁諜」。"
+  }
+]

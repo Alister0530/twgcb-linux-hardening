@@ -1,0 +1,917 @@
+[
+  {
+    "id": "TWGCB-01-014-0155",
+    "category": "AppArmor",
+    "title": "AppArmor 套件",
+    "expected": "安裝",
+    "doc_method": "開啟終端機，執行 #apt install apparmor 安裝 AppArmor",
+    "type": "package_present",
+    "params": {
+      "pkg": "apparmor"
+    },
+    "check": "以 dpkg-query -W -f='${Status}' apparmor 查詢，狀態為「install ok installed」即合格。",
+    "fix": "執行 apt-get install -y apparmor；記錄本工具安裝了此套件，回滾時以 apt-get remove apparmor 移除（若原本即已安裝則不動作）。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 22.04 伺服器預設已安裝，安裝套件本身不改變既有服務行為。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設已安裝 apparmor；若需使用 aa-enforce/aa-complain 等工具另需 apparmor-utils 套件（預設未安裝）。本條為 AppArmor 套件，依說明不屬於已實作規則。"
+  },
+  {
+    "id": "TWGCB-01-014-0156",
+    "category": "AppArmor",
+    "title": "開機載入程式啟用 AppArmor",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/default/grub，在 GRUB_CMDLINE_LINUX 參數加入「apparmor=1」與「security=apparmor」，範例：GRUB_CMDLINE_LINUX=\"apparmor=1 security=apparmor\"；執行 #update-grub 更新 grub2 設定檔",
+    "type": "grub_arg",
+    "params": {
+      "args": [
+        "apparmor=1",
+        "security=apparmor"
+      ],
+      "var": "GRUB_CMDLINE_LINUX"
+    },
+    "check": "(1) 解析 /etc/default/grub 與 /etc/default/grub.d/*.cfg（依 grub-mkconfig 的 source 順序）得到最終 GRUB_CMDLINE_LINUX，需同時包含 apparmor=1 與 security=apparmor；(2) 輔助檢查：/boot/grub/grub.cfg 中所有 linux 開機行皆含這兩個參數。/proc/cmdline 僅作為「是否已重開機生效」的資訊，不作為設定合格依據。",
+    "fix": "建立 drop-in /etc/default/grub.d/99-gcb-apparmor.cfg，內容：GRUB_CMDLINE_LINUX=\"$GRUB_CMDLINE_LINUX apparmor=1 security=apparmor\"；備份 /boot/grub/grub.cfg 後執行 update-grub。回滾：刪除該 drop-in 並還原 grub.cfg（或重新執行 update-grub）。需重開機生效。",
+    "risk": "B",
+    "risk_reason": "修改核心開機參數需重開機，參數錯誤可能影響開機。",
+    "needs_reboot": true,
+    "applies_when": "使用 GRUB 開機的系統（存在 /etc/default/grub）",
+    "notes": "Ubuntu 22.04 核心預設已以 AppArmor 為 LSM（無需參數即啟用），加參數主要是符合 GCB 字面要求；security= 為舊式參數，新核心建議使用 lsm=，指定 security=apparmor 不會影響 landlock/yama 等次要 LSM。雲端映像檔可能使用 /etc/default/grub.d/50-cloudimg-settings.cfg 覆寫 GRUB_CMDLINE_LINUX，drop-in 檔名須排序在其之後（99-）。容器或非 GRUB 環境（如部分 ARM、EFI stub）不適用。"
+  },
+  {
+    "id": "TWGCB-01-014-0157",
+    "category": "AppArmor",
+    "title": "AppArmor 啟用狀態",
+    "expected": "Enforce",
+    "doc_method": "開啟終端機，執行 #aa-enforce /etc/apparmor.d/* 啟用強制(Enforce)模式",
+    "type": "custom",
+    "params": {
+      "desc": "所有已載入的 AppArmor profile 須為 enforce 模式"
+    },
+    "check": "確認 AppArmor 已啟用（/sys/module/apparmor/parameters/enabled 為 Y），讀取 /sys/kernel/security/apparmor/profiles（或 aa-status --json），每行格式「名稱 (模式)」；全部 profile 皆為 (enforce) 且至少載入 1 個 profile 即合格，存在 (complain) 或 (kill)/(unconfined) 以外的非 enforce 模式即不合格。",
+    "fix": "安裝 apparmor-utils（若未安裝，記錄以便回滾）；先記錄每個 profile 目前模式（含 /etc/apparmor.d/disable/ 與 /etc/apparmor.d/force-complain/ 內的連結清單），只對 /etc/apparmor.d/ 下的一般 profile 檔案（排除目錄 abstractions、tunables、local、disable 等）執行 aa-enforce。回滾：依記錄對原為 complain 的 profile 執行 aa-complain，並還原 disable/force-complain 連結。",
+    "risk": "B",
+    "risk_reason": "將 profile 由 complain 切為 enforce 可能阻擋服務正常存取而造成服務中斷。",
+    "needs_reboot": false,
+    "applies_when": "已安裝並啟用 AppArmor",
+    "notes": "已實作。文件指令 aa-enforce /etc/apparmor.d/* 會包含子目錄與非 profile 檔，可能出錯，應僅處理 profile 檔案；aa-enforce 需 apparmor-utils（Ubuntu 22.04 伺服器預設未安裝）。文件建議先測試再啟用。"
+  },
+  {
+    "id": "TWGCB-01-014-0158",
+    "category": "cron 設定",
+    "title": "cron 守護程序",
+    "expected": "啟用",
+    "doc_method": "開啟終端機，執行 #systemctl --now enable cron 啟用 cron 守護程序",
+    "type": "service_enabled",
+    "params": {
+      "unit": "cron.service",
+      "pkg": "cron"
+    },
+    "check": "systemctl is-enabled cron 為 enabled 且 systemctl is-active cron 為 active 即合格。",
+    "fix": "記錄原本 enabled/active 狀態後執行 systemctl --now enable cron；回滾時依記錄 disable 及/或 stop。若未安裝 cron 則回報不合格並提示安裝（apt-get install cron）。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 22.04 預設即啟用 cron，啟用不影響登入。",
+    "needs_reboot": false,
+    "applies_when": "一律（未安裝 cron 套件時判定不合格）",
+    "notes": "Ubuntu 22.04 伺服器預設安裝並啟用 cron；systemd unit 名稱為 cron.service（非 RHEL 的 crond）。"
+  },
+  {
+    "id": "TWGCB-01-014-0159",
+    "category": "cron 設定",
+    "title": "/etc/crontab 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "開啟終端機，執行 #chown root:root /etc/crontab",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/crontab",
+      "owner": "root",
+      "group": [
+        "root"
+      ],
+      "max_mode": null
+    },
+    "check": "以 os.stat 讀取 /etc/crontab，擁有者 UID 為 0 且群組 GID 為 0 即合格；不存在時視為不適用。",
+    "fix": "記錄原擁有者/群組後執行 chown root:root /etc/crontab；回滾時以 chown 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 檔案權限調整屬低風險設定。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/crontab 存在）",
+    "notes": "Ubuntu 22.04 預設即為 root:root。"
+  },
+  {
+    "id": "TWGCB-01-014-0160",
+    "category": "cron 設定",
+    "title": "/etc/crontab 檔案權限",
+    "expected": "600 或更低權限",
+    "doc_method": "開啟終端機，執行 #chmod 600 /etc/crontab",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/crontab",
+      "owner": null,
+      "group": null,
+      "max_mode": "0600"
+    },
+    "check": "以 os.stat 讀取 /etc/crontab 權限位元，(mode & ~0o600) == 0 即合格（不得有超出 600 的權限位元，含 setuid/setgid/sticky）；不存在時視為不適用。",
+    "fix": "記錄原權限後執行 chmod 600 /etc/crontab（或以原權限 & 0o600 計算，只移除多餘位元）；回滾時以 chmod 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 檔案權限收緊，僅影響非 root 讀取，不影響排程執行。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/crontab 存在）",
+    "notes": "Ubuntu 22.04 預設為 644。"
+  },
+  {
+    "id": "TWGCB-01-014-0161",
+    "category": "cron 設定",
+    "title": "/etc/cron.hourly 目錄所有權",
+    "expected": "root:root",
+    "doc_method": "開啟終端機，執行 #chown root:root /etc/cron.hourly",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.hourly",
+      "owner": "root",
+      "group": [
+        "root"
+      ],
+      "max_mode": null
+    },
+    "check": "以 os.stat 讀取 /etc/cron.hourly，擁有者 UID 為 0 且群組 GID 為 0 即合格；不存在時視為不適用。",
+    "fix": "記錄原擁有者/群組後執行 chown root:root /etc/cron.hourly；回滾時以 chown 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限調整屬低風險設定。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.hourly 存在）",
+    "notes": "Ubuntu 22.04 預設即為 root:root。"
+  },
+  {
+    "id": "TWGCB-01-014-0162",
+    "category": "cron 設定",
+    "title": "/etc/cron.hourly 目錄權限",
+    "expected": "700 或更低權限",
+    "doc_method": "開啟終端機，執行 #chmod 700 /etc/cron.hourly",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.hourly",
+      "owner": null,
+      "group": null,
+      "max_mode": "0700"
+    },
+    "check": "以 os.stat 讀取 /etc/cron.hourly 權限位元，(mode & ~0o700) == 0 即合格（不得有超出 700 的權限位元，含 setuid/setgid/sticky）；不存在時視為不適用。",
+    "fix": "記錄原權限後執行 chmod 700 /etc/cron.hourly（或以原權限 & 0o700 計算，只移除多餘位元）；回滾時以 chmod 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限收緊，僅影響非 root 讀取，不影響排程執行。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.hourly 存在）",
+    "notes": "Ubuntu 22.04 預設為 755。"
+  },
+  {
+    "id": "TWGCB-01-014-0163",
+    "category": "cron 設定",
+    "title": "/etc/cron.daily 目錄所有權",
+    "expected": "root:root",
+    "doc_method": "開啟終端機，執行 #chown root:root /etc/cron.daily",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.daily",
+      "owner": "root",
+      "group": [
+        "root"
+      ],
+      "max_mode": null
+    },
+    "check": "以 os.stat 讀取 /etc/cron.daily，擁有者 UID 為 0 且群組 GID 為 0 即合格；不存在時視為不適用。",
+    "fix": "記錄原擁有者/群組後執行 chown root:root /etc/cron.daily；回滾時以 chown 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限調整屬低風險設定。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.daily 存在）",
+    "notes": "Ubuntu 22.04 預設即為 root:root。"
+  },
+  {
+    "id": "TWGCB-01-014-0164",
+    "category": "cron 設定",
+    "title": "/etc/cron.daily 目錄權限",
+    "expected": "700 或更低權限",
+    "doc_method": "開啟終端機，執行 #chmod 700 /etc/cron.daily",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.daily",
+      "owner": null,
+      "group": null,
+      "max_mode": "0700"
+    },
+    "check": "以 os.stat 讀取 /etc/cron.daily 權限位元，(mode & ~0o700) == 0 即合格（不得有超出 700 的權限位元，含 setuid/setgid/sticky）；不存在時視為不適用。",
+    "fix": "記錄原權限後執行 chmod 700 /etc/cron.daily（或以原權限 & 0o700 計算，只移除多餘位元）；回滾時以 chmod 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限收緊，僅影響非 root 讀取，不影響排程執行。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.daily 存在）",
+    "notes": "Ubuntu 22.04 預設為 755。"
+  },
+  {
+    "id": "TWGCB-01-014-0165",
+    "category": "cron 設定",
+    "title": "/etc/cron.weekly 目錄所有權",
+    "expected": "root:root",
+    "doc_method": "開啟終端機，執行 #chown root:root /etc/cron.weekly",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.weekly",
+      "owner": "root",
+      "group": [
+        "root"
+      ],
+      "max_mode": null
+    },
+    "check": "以 os.stat 讀取 /etc/cron.weekly，擁有者 UID 為 0 且群組 GID 為 0 即合格；不存在時視為不適用。",
+    "fix": "記錄原擁有者/群組後執行 chown root:root /etc/cron.weekly；回滾時以 chown 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限調整屬低風險設定。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.weekly 存在）",
+    "notes": "Ubuntu 22.04 預設即為 root:root。"
+  },
+  {
+    "id": "TWGCB-01-014-0166",
+    "category": "cron 設定",
+    "title": "/etc/cron.weekly 目錄權限",
+    "expected": "700 或更低權限",
+    "doc_method": "開啟終端機，執行 #chmod 700 /etc/cron.weekly",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.weekly",
+      "owner": null,
+      "group": null,
+      "max_mode": "0700"
+    },
+    "check": "以 os.stat 讀取 /etc/cron.weekly 權限位元，(mode & ~0o700) == 0 即合格（不得有超出 700 的權限位元，含 setuid/setgid/sticky）；不存在時視為不適用。",
+    "fix": "記錄原權限後執行 chmod 700 /etc/cron.weekly（或以原權限 & 0o700 計算，只移除多餘位元）；回滾時以 chmod 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限收緊，僅影響非 root 讀取，不影響排程執行。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.weekly 存在）",
+    "notes": "Ubuntu 22.04 預設為 755。"
+  },
+  {
+    "id": "TWGCB-01-014-0167",
+    "category": "cron 設定",
+    "title": "/etc/cron.monthly 目錄所有權",
+    "expected": "root:root",
+    "doc_method": "開啟終端機，執行 #chown root:root /etc/cron.monthly",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.monthly",
+      "owner": "root",
+      "group": [
+        "root"
+      ],
+      "max_mode": null
+    },
+    "check": "以 os.stat 讀取 /etc/cron.monthly，擁有者 UID 為 0 且群組 GID 為 0 即合格；不存在時視為不適用。",
+    "fix": "記錄原擁有者/群組後執行 chown root:root /etc/cron.monthly；回滾時以 chown 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限調整屬低風險設定。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.monthly 存在）",
+    "notes": "Ubuntu 22.04 預設即為 root:root。"
+  },
+  {
+    "id": "TWGCB-01-014-0168",
+    "category": "cron 設定",
+    "title": "/etc/cron.monthly 目錄權限",
+    "expected": "700 或更低權限",
+    "doc_method": "開啟終端機，執行 #chmod 700 /etc/cron.monthly",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.monthly",
+      "owner": null,
+      "group": null,
+      "max_mode": "0700"
+    },
+    "check": "以 os.stat 讀取 /etc/cron.monthly 權限位元，(mode & ~0o700) == 0 即合格（不得有超出 700 的權限位元，含 setuid/setgid/sticky）；不存在時視為不適用。",
+    "fix": "記錄原權限後執行 chmod 700 /etc/cron.monthly（或以原權限 & 0o700 計算，只移除多餘位元）；回滾時以 chmod 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限收緊，僅影響非 root 讀取，不影響排程執行。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.monthly 存在）",
+    "notes": "Ubuntu 22.04 預設為 755。"
+  },
+  {
+    "id": "TWGCB-01-014-0169",
+    "category": "cron 設定",
+    "title": "/etc/cron.d 目錄所有權",
+    "expected": "root:root",
+    "doc_method": "開啟終端機，執行 #chown root:root /etc/cron.d",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.d",
+      "owner": "root",
+      "group": [
+        "root"
+      ],
+      "max_mode": null
+    },
+    "check": "以 os.stat 讀取 /etc/cron.d，擁有者 UID 為 0 且群組 GID 為 0 即合格；不存在時視為不適用。",
+    "fix": "記錄原擁有者/群組後執行 chown root:root /etc/cron.d；回滾時以 chown 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限調整屬低風險設定。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.d 存在）",
+    "notes": "Ubuntu 22.04 預設即為 root:root。"
+  },
+  {
+    "id": "TWGCB-01-014-0170",
+    "category": "cron 設定",
+    "title": "/etc/cron.d 目錄權限",
+    "expected": "700 或更低權限",
+    "doc_method": "開啟終端機，執行 #chmod 700 /etc/cron.d",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/cron.d",
+      "owner": null,
+      "group": null,
+      "max_mode": "0700"
+    },
+    "check": "以 os.stat 讀取 /etc/cron.d 權限位元，(mode & ~0o700) == 0 即合格（不得有超出 700 的權限位元，含 setuid/setgid/sticky）；不存在時視為不適用。",
+    "fix": "記錄原權限後執行 chmod 700 /etc/cron.d（或以原權限 & 0o700 計算，只移除多餘位元）；回滾時以 chmod 還原記錄值。",
+    "risk": "A",
+    "risk_reason": "cron 目錄權限收緊，僅影響非 root 讀取，不影響排程執行。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（/etc/cron.d 存在）",
+    "notes": "Ubuntu 22.04 預設為 755。"
+  },
+  {
+    "id": "TWGCB-01-014-0171",
+    "category": "cron 設定",
+    "title": "at.allow 與 cron.allow 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "移除 /etc/cron.deny 與 /etc/at.deny，建立 /etc/cron.allow 與 /etc/at.allow 後設定所有權：#rm /etc/cron.deny #rm /etc/at.deny #touch /etc/cron.allow #touch /etc/at.allow #chown root:root /etc/cron.allow #chown root:root /etc/at.allow",
+    "type": "custom",
+    "params": {
+      "desc": "cron.deny/at.deny 不存在，且 cron.allow/at.allow 存在並為 root:root",
+      "absent": [
+        "/etc/cron.deny",
+        "/etc/at.deny"
+      ],
+      "file_perm": [
+        {
+          "path": "/etc/cron.allow",
+          "owner": "root",
+          "group": [
+            "root"
+          ]
+        },
+        {
+          "path": "/etc/at.allow",
+          "owner": "root",
+          "group": [
+            "root"
+          ]
+        }
+      ]
+    },
+    "check": "(1) /etc/cron.deny 不存在；(2) /etc/cron.allow 存在且 UID 0、GID 0；(3) 若已安裝 at（dpkg 狀態 installed 或存在 /usr/bin/at），另需 /etc/at.deny 不存在、/etc/at.allow 存在且 UID 0、GID 0。全部成立即合格。",
+    "fix": "備份（複製到備份目錄）/etc/cron.deny、/etc/at.deny 後刪除；若 allow 檔不存在則建立空檔（記錄為本工具建立，回滾時刪除），存在則記錄原擁有者；chown root:root。回滾：還原 deny 檔、刪除新建 allow 檔或還原擁有者。",
+    "risk": "B",
+    "risk_reason": "建立空 allow 檔並移除 deny 檔後，所有非 root 使用者將無法使用 crontab/at。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（at 部分僅在已安裝 at 時適用）",
+    "notes": "Ubuntu 22.04 預設沒有 /etc/cron.allow、/etc/cron.deny、/etc/at.allow；at 套件預設未安裝，安裝後才有 /etc/at.deny。建立空的 allow 檔代表僅 root 可使用 crontab/at。Debian 系的 crontab 為 setgid crontab、at 為 setuid/setgid daemon，若 allow 檔為 root:root 600，列在 allow 檔中的一般使用者也可能因無法讀取而被拒（CIS Ubuntu 建議 root:crontab 640 與 root:daemon 640），與 GCB 值衝突，需人工確認。"
+  },
+  {
+    "id": "TWGCB-01-014-0172",
+    "category": "cron 設定",
+    "title": "at.allow 與 cron.allow 檔案權限",
+    "expected": "600 或更低權限",
+    "doc_method": "移除 /etc/cron.deny 與 /etc/at.deny，建立 /etc/cron.allow 與 /etc/at.allow 後設定權限：#rm /etc/cron.deny #rm /etc/at.deny #touch /etc/cron.allow #touch /etc/at.allow #chmod 600 /etc/cron.allow #chmod 600 /etc/at.allow",
+    "type": "custom",
+    "params": {
+      "desc": "cron.deny/at.deny 不存在，且 cron.allow/at.allow 存在並權限 <= 600",
+      "absent": [
+        "/etc/cron.deny",
+        "/etc/at.deny"
+      ],
+      "file_perm": [
+        {
+          "path": "/etc/cron.allow",
+          "max_mode": "0600"
+        },
+        {
+          "path": "/etc/at.allow",
+          "max_mode": "0600"
+        }
+      ]
+    },
+    "check": "(1) /etc/cron.deny 不存在；(2) /etc/cron.allow 存在且 (mode & ~0o600)==0；(3) 若已安裝 at，另需 /etc/at.deny 不存在、/etc/at.allow 存在且 (mode & ~0o600)==0。",
+    "fix": "同 0171 的 deny 檔備份刪除與 allow 檔建立流程，另記錄原權限後 chmod 600。回滾：還原 deny 檔、刪除新建 allow 檔或還原原權限。建議與 0171 共用同一修復動作避免重複備份。",
+    "risk": "B",
+    "risk_reason": "建立空 allow 檔並移除 deny 檔後，所有非 root 使用者將無法使用 crontab/at。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 cron（at 部分僅在已安裝 at 時適用）",
+    "notes": "Ubuntu 22.04 預設沒有 /etc/cron.allow、/etc/cron.deny、/etc/at.allow；at 套件預設未安裝，安裝後才有 /etc/at.deny。建立空的 allow 檔代表僅 root 可使用 crontab/at。Debian 系的 crontab 為 setgid crontab、at 為 setuid/setgid daemon，若 allow 檔為 root:root 600，列在 allow 檔中的一般使用者也可能因無法讀取而被拒（CIS Ubuntu 建議 root:crontab 640 與 root:daemon 640），與 GCB 值衝突，需人工確認。"
+  },
+  {
+    "id": "TWGCB-01-014-0173",
+    "category": "帳號與存取控制",
+    "title": "通行碼最小長度",
+    "expected": "12 個字元以上",
+    "doc_method": "編輯 /etc/security/pwquality.conf 檔案，新增或修改成以下內容：minlen=12",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/security/pwquality.conf",
+      "key": "minlen",
+      "value": "12",
+      "cmp": "ge",
+      "sep": "=",
+      "dropin_dir": "/etc/security/pwquality.conf.d"
+    },
+    "check": "依 libpwquality 讀取順序解析 /etc/security/pwquality.conf 再讀 /etc/security/pwquality.conf.d/*.conf（字母序，後者覆寫），忽略 # 註解，取 minlen 最終值，數值 >= 12 即合格；並確認 /etc/pam.d/common-password 有未註解的 pam_pwquality.so 行，且該行沒有以參數覆寫 minlen 為不合格值（PAM 行參數優先於設定檔）。",
+    "fix": "若未安裝 libpam-pwquality 則安裝（記錄以便回滾移除，安裝前備份 /etc/pam.d/common-password）；建立或更新 drop-in /etc/security/pwquality.conf.d/99-gcb.conf 寫入 minlen = 12。若主檔或其他 drop-in 有更後順序的衝突值，備份該檔後註解掉。回滾：刪除/還原 drop-in 與備份檔。",
+    "risk": "A",
+    "risk_reason": "僅影響之後變更通行碼時的複雜度檢查，不影響既有登入。",
+    "needs_reboot": false,
+    "applies_when": "一律（需搭配 libpam-pwquality）",
+    "notes": "已實作。Ubuntu 22.04 預設未安裝 libpam-pwquality，common-password 預設僅有 pam_unix.so obscure yescrypt，pwquality.conf 參數不會生效；需安裝 libpam-pwquality（安裝時 pam-auth-update 會自動啟用 pwquality profile）。libpwquality 1.4.4 支援 /etc/security/pwquality.conf.d/*.conf，後讀取的檔案會覆寫主檔設定。"
+  },
+  {
+    "id": "TWGCB-01-014-0174",
+    "category": "帳號與存取控制",
+    "title": "通行碼必須至少包含數字個數",
+    "expected": "1 個以上",
+    "doc_method": "編輯 /etc/security/pwquality.conf 檔案，新增或修改成以下內容：dcredit=-1（dcredit=-1 表示至少包含 1 個數字）",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/security/pwquality.conf",
+      "key": "dcredit",
+      "value": "-1",
+      "cmp": "le",
+      "sep": "=",
+      "dropin_dir": "/etc/security/pwquality.conf.d"
+    },
+    "check": "依 libpwquality 讀取順序解析 /etc/security/pwquality.conf 再讀 /etc/security/pwquality.conf.d/*.conf（字母序，後者覆寫），忽略 # 註解，取 dcredit 最終值，數值 <= -1 即合格；並確認 /etc/pam.d/common-password 有未註解的 pam_pwquality.so 行，且該行沒有以參數覆寫 dcredit 為不合格值（PAM 行參數優先於設定檔）。",
+    "fix": "若未安裝 libpam-pwquality 則安裝（記錄以便回滾移除，安裝前備份 /etc/pam.d/common-password）；建立或更新 drop-in /etc/security/pwquality.conf.d/99-gcb.conf 寫入 dcredit = -1。若主檔或其他 drop-in 有更後順序的衝突值，備份該檔後註解掉。回滾：刪除/還原 drop-in 與備份檔。",
+    "risk": "A",
+    "risk_reason": "僅影響之後變更通行碼時的複雜度檢查，不影響既有登入。",
+    "needs_reboot": false,
+    "applies_when": "一律（需搭配 libpam-pwquality）",
+    "notes": "「1 個以上」對應 dcredit <= -1（負值越小要求越多）。Ubuntu 22.04 預設未安裝 libpam-pwquality，common-password 預設僅有 pam_unix.so obscure yescrypt，pwquality.conf 參數不會生效；需安裝 libpam-pwquality（安裝時 pam-auth-update 會自動啟用 pwquality profile）。libpwquality 1.4.4 支援 /etc/security/pwquality.conf.d/*.conf，後讀取的檔案會覆寫主檔設定。"
+  },
+  {
+    "id": "TWGCB-01-014-0175",
+    "category": "帳號與存取控制",
+    "title": "通行碼必須至少包含大寫字母個數",
+    "expected": "1 個以上",
+    "doc_method": "編輯 /etc/security/pwquality.conf 檔案，新增或修改成以下內容：ucredit=-1（ucredit=-1 表示至少包含 1 個大寫字母）",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/security/pwquality.conf",
+      "key": "ucredit",
+      "value": "-1",
+      "cmp": "le",
+      "sep": "=",
+      "dropin_dir": "/etc/security/pwquality.conf.d"
+    },
+    "check": "依 libpwquality 讀取順序解析 /etc/security/pwquality.conf 再讀 /etc/security/pwquality.conf.d/*.conf（字母序，後者覆寫），忽略 # 註解，取 ucredit 最終值，數值 <= -1 即合格；並確認 /etc/pam.d/common-password 有未註解的 pam_pwquality.so 行，且該行沒有以參數覆寫 ucredit 為不合格值（PAM 行參數優先於設定檔）。",
+    "fix": "若未安裝 libpam-pwquality 則安裝（記錄以便回滾移除，安裝前備份 /etc/pam.d/common-password）；建立或更新 drop-in /etc/security/pwquality.conf.d/99-gcb.conf 寫入 ucredit = -1。若主檔或其他 drop-in 有更後順序的衝突值，備份該檔後註解掉。回滾：刪除/還原 drop-in 與備份檔。",
+    "risk": "A",
+    "risk_reason": "僅影響之後變更通行碼時的複雜度檢查，不影響既有登入。",
+    "needs_reboot": false,
+    "applies_when": "一律（需搭配 libpam-pwquality）",
+    "notes": "「1 個以上」對應 ucredit <= -1。Ubuntu 22.04 預設未安裝 libpam-pwquality，common-password 預設僅有 pam_unix.so obscure yescrypt，pwquality.conf 參數不會生效；需安裝 libpam-pwquality（安裝時 pam-auth-update 會自動啟用 pwquality profile）。libpwquality 1.4.4 支援 /etc/security/pwquality.conf.d/*.conf，後讀取的檔案會覆寫主檔設定。"
+  },
+  {
+    "id": "TWGCB-01-014-0176",
+    "category": "帳號與存取控制",
+    "title": "通行碼必須至少包含小寫字母個數",
+    "expected": "1 個以上",
+    "doc_method": "編輯 /etc/security/pwquality.conf 檔案，新增或修改成以下內容：lcredit=-1（lcredit=-1 表示至少包含 1 個小寫字母）",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/security/pwquality.conf",
+      "key": "lcredit",
+      "value": "-1",
+      "cmp": "le",
+      "sep": "=",
+      "dropin_dir": "/etc/security/pwquality.conf.d"
+    },
+    "check": "依 libpwquality 讀取順序解析 /etc/security/pwquality.conf 再讀 /etc/security/pwquality.conf.d/*.conf（字母序，後者覆寫），忽略 # 註解，取 lcredit 最終值，數值 <= -1 即合格；並確認 /etc/pam.d/common-password 有未註解的 pam_pwquality.so 行，且該行沒有以參數覆寫 lcredit 為不合格值（PAM 行參數優先於設定檔）。",
+    "fix": "若未安裝 libpam-pwquality 則安裝（記錄以便回滾移除，安裝前備份 /etc/pam.d/common-password）；建立或更新 drop-in /etc/security/pwquality.conf.d/99-gcb.conf 寫入 lcredit = -1。若主檔或其他 drop-in 有更後順序的衝突值，備份該檔後註解掉。回滾：刪除/還原 drop-in 與備份檔。",
+    "risk": "A",
+    "risk_reason": "僅影響之後變更通行碼時的複雜度檢查，不影響既有登入。",
+    "needs_reboot": false,
+    "applies_when": "一律（需搭配 libpam-pwquality）",
+    "notes": "「1 個以上」對應 lcredit <= -1。Ubuntu 22.04 預設未安裝 libpam-pwquality，common-password 預設僅有 pam_unix.so obscure yescrypt，pwquality.conf 參數不會生效；需安裝 libpam-pwquality（安裝時 pam-auth-update 會自動啟用 pwquality profile）。libpwquality 1.4.4 支援 /etc/security/pwquality.conf.d/*.conf，後讀取的檔案會覆寫主檔設定。"
+  },
+  {
+    "id": "TWGCB-01-014-0177",
+    "category": "帳號與存取控制",
+    "title": "通行碼必須至少包含特殊字元個數",
+    "expected": "1 個以上",
+    "doc_method": "編輯 /etc/security/pwquality.conf 檔案，新增或修改成以下內容：ocredit=-1（ocredit=-1 表示至少包含 1 個特殊字元）",
+    "type": "kv_config",
+    "params": {
+      "path": "/etc/security/pwquality.conf",
+      "key": "ocredit",
+      "value": "-1",
+      "cmp": "le",
+      "sep": "=",
+      "dropin_dir": "/etc/security/pwquality.conf.d"
+    },
+    "check": "依 libpwquality 讀取順序解析 /etc/security/pwquality.conf 再讀 /etc/security/pwquality.conf.d/*.conf（字母序，後者覆寫），忽略 # 註解，取 ocredit 最終值，數值 <= -1 即合格；並確認 /etc/pam.d/common-password 有未註解的 pam_pwquality.so 行，且該行沒有以參數覆寫 ocredit 為不合格值（PAM 行參數優先於設定檔）。",
+    "fix": "若未安裝 libpam-pwquality 則安裝（記錄以便回滾移除，安裝前備份 /etc/pam.d/common-password）；建立或更新 drop-in /etc/security/pwquality.conf.d/99-gcb.conf 寫入 ocredit = -1。若主檔或其他 drop-in 有更後順序的衝突值，備份該檔後註解掉。回滾：刪除/還原 drop-in 與備份檔。",
+    "risk": "A",
+    "risk_reason": "僅影響之後變更通行碼時的複雜度檢查，不影響既有登入。",
+    "needs_reboot": false,
+    "applies_when": "一律（需搭配 libpam-pwquality）",
+    "notes": "「1 個以上」對應 ocredit <= -1。文件說明誤植：ocredit >= 0 時應為「每出現 1 個特殊字元」，原文寫成「小寫字母」。Ubuntu 22.04 預設未安裝 libpam-pwquality，common-password 預設僅有 pam_unix.so obscure yescrypt，pwquality.conf 參數不會生效；需安裝 libpam-pwquality（安裝時 pam-auth-update 會自動啟用 pwquality profile）。libpwquality 1.4.4 支援 /etc/security/pwquality.conf.d/*.conf，後讀取的檔案會覆寫主檔設定。"
+  },
+  {
+    "id": "TWGCB-01-014-0178",
+    "category": "帳號與存取控制",
+    "title": "帳戶鎖定閾值",
+    "expected": "5 次以下，但須大於 0",
+    "doc_method": "編輯 /etc/pam.d/common-auth，新增或修改成：auth required pam_faillock.so preauth / auth [success=1 default=ignore] pam_unix.so nullok / auth [default=die] pam_faillock.so authfail / auth sufficient pam_faillock.so authsucc；編輯 /etc/pam.d/common-account 新增：auth required pam_faillock.so；編輯 /etc/security/faillock.conf 新增或修改：deny=5",
+    "type": "pam",
+    "params": {
+      "desc": "common-auth 啟用 pam_faillock preauth/authfail/authsucc、common-account 啟用 pam_faillock，faillock.conf deny 介於 1~5",
+      "kv": {
+        "path": "/etc/security/faillock.conf",
+        "key": "deny",
+        "value": "5",
+        "cmp": "range",
+        "min": 1,
+        "max": 5,
+        "sep": "="
+      }
+    },
+    "check": "(1) /etc/pam.d/common-auth 有未註解的 pam_faillock.so preauth（在 pam_unix.so 之前）與 pam_faillock.so authfail（在 pam_unix.so 之後）；(2) /etc/pam.d/common-account 有未註解的 account ... pam_faillock.so；(3) deny 取值：PAM 行上的 deny= 參數優先，否則取 /etc/security/faillock.conf 未註解的 deny（可為 deny=5 或 deny = 5），未設定時預設值為 3；1 <= deny <= 5 即合格。",
+    "fix": "備份 /etc/security/faillock.conf，將 deny 行改為/新增 deny = 5（註解掉其他 deny 行）。PAM 部分以 pam-auth-update 管理：建立 /usr/share/pam-configs/gcb-faillock（Auth-Type: Primary，Priority 高於 unix 的 256，Auth-Initial: auth required pam_faillock.so preauth，Account-Type: Additional，Account: required pam_faillock.so）與 /usr/share/pam-configs/gcb-faillock-notify（Auth-Type: Primary，Priority 低於 unix，Auth: [default=die] pam_faillock.so authfail 與 sufficient pam_faillock.so authsucc），備份 /etc/pam.d/common-auth、common-account 與 /var/lib/pam/ 後執行 pam-auth-update --package --enable gcb-faillock gcb-faillock-notify；修復後驗證 common-auth 中 pam_unix.so 的 success=N 跳躍數正確（pam-auth-update 會自動計算）。回滾：pam-auth-update --package --remove 該二 profile、刪除 profile 檔並還原備份。",
+    "risk": "B",
+    "risk_reason": "修改 PAM 認證堆疊，設定錯誤可能導致全部帳號無法登入，且會造成帳號被鎖定。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "已實作。文件錯誤：common-account 應新增「account required pam_faillock.so」，原文誤寫為 auth；「auth[success=1 default=ignore]」缺少空白。Ubuntu 22.04 的 pam_faillock 包含在 libpam-modules（PAM 1.4.0），預設未啟用，/etc/security/faillock.conf 存在但參數皆為註解；faillock.conf 不支援 drop-in 目錄，只能編輯主檔。PAM 行上的參數會覆寫 faillock.conf。"
+  },
+  {
+    "id": "TWGCB-01-014-0179",
+    "category": "帳號與存取控制",
+    "title": "帳戶鎖定時間",
+    "expected": "fail_interval 設定 900 秒以下但須大於 0，unlock_time 設定 900 秒以上",
+    "doc_method": "編輯 /etc/pam.d/common-auth，新增或修改成：auth required pam_faillock.so preauth / auth [success=1 default=ignore] pam_unix.so nullok / auth [default=die] pam_faillock.so authfail / auth sufficient pam_faillock.so authsucc；編輯 /etc/pam.d/common-account 新增：auth required pam_faillock.so；編輯 /etc/security/faillock.conf 新增或修改：fail_interval=900 與 unlock_time=900；未到解鎖時間可由管理者執行 #faillock --user (使用者帳號名稱) --reset 解鎖",
+    "type": "pam",
+    "params": {
+      "desc": "pam_faillock 已啟用（同 0178），faillock.conf fail_interval 1~900、unlock_time >= 900",
+      "kv": [
+        {
+          "path": "/etc/security/faillock.conf",
+          "key": "fail_interval",
+          "value": "900",
+          "cmp": "range",
+          "min": 1,
+          "max": 900,
+          "sep": "="
+        },
+        {
+          "path": "/etc/security/faillock.conf",
+          "key": "unlock_time",
+          "value": "900",
+          "cmp": "ge",
+          "sep": "="
+        }
+      ]
+    },
+    "check": "同 0178 確認 PAM 堆疊已啟用 pam_faillock；fail_interval 與 unlock_time 取值方式：PAM 行參數優先，否則取 /etc/security/faillock.conf 未註解值，未設定時預設皆為 900；1 <= fail_interval <= 900 且 unlock_time >= 900 即合格。",
+    "fix": "備份 /etc/security/faillock.conf，設定 fail_interval = 900 與 unlock_time = 900（註解掉衝突行）；PAM 堆疊處理同 0178（若 0178 已處理則不重複）。回滾：還原 faillock.conf。",
+    "risk": "B",
+    "risk_reason": "涉及 PAM 堆疊與帳號鎖定時間，影響使用者登入可用性。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "文件錯誤：common-account 應新增「account required pam_faillock.so」，原文誤寫為 auth；「auth[success=1 default=ignore]」缺少空白。Ubuntu 22.04 的 pam_faillock 包含在 libpam-modules（PAM 1.4.0），預設未啟用，/etc/security/faillock.conf 存在但參數皆為註解；faillock.conf 不支援 drop-in 目錄，只能編輯主檔。PAM 行上的參數會覆寫 faillock.conf。unlock_time=0 代表永久鎖定直到管理者解鎖，依字面「900 秒以上」不符，但安全上更嚴格，需決定是否視為合格（建議判為合格並註記）。pam_faillock 預設 fail_interval=900、unlock_time=600，故未設定 unlock_time 時不合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0180",
+    "category": "帳號與存取控制",
+    "title": "強制執行通行碼歷程記錄",
+    "expected": "3 以上",
+    "doc_method": "編輯 /etc/pam.d/common-password，在 pam_unix.so 那行行尾新增參數「remember=3」，範例：password [success=1 default=ignore] pam_unix.so obscure use_authtok try_first_pass remember=3",
+    "type": "pam",
+    "params": {
+      "desc": "common-password 的 pam_unix.so 行含 remember=N 且 N >= 3",
+      "file": "/etc/pam.d/common-password",
+      "module": "pam_unix.so",
+      "arg": "remember",
+      "value": 3,
+      "cmp": "ge"
+    },
+    "check": "解析 /etc/pam.d/common-password 未註解的 password 類型 pam_unix.so 行，取 remember= 參數值，>= 3 即合格；（可接受替代：同檔有 pam_pwhistory.so remember>=3 且位於 pam_unix.so 之前）。",
+    "fix": "以 pam-auth-update 管理：複製 /usr/share/pam-configs/unix 為 /usr/share/pam-configs/gcb-unix，Name 改為 GCB Unix authentication、Priority 設為 257，於 Password: 與 Password-Initial: 的 pam_unix.so 參數加入 remember=3；備份 /etc/pam.d/common-* 與 /var/lib/pam/ 後執行 pam-auth-update --package --enable gcb-unix --disable unix（或同等的非互動方式），完成後驗證 common-auth/common-password 仍為完整可用堆疊。回滾：還原 unix profile 啟用、移除 gcb-unix 並還原備份。（替代方案：直接編輯 /etc/pam.d/common-password 的 pam_unix.so 行並備份；但之後 pam-auth-update 會因偵測到本機修改而不再自動更新該檔）。另確認 /etc/security/opasswd 存在且為 root:root 600（不存在時建立，回滾時刪除）。",
+    "risk": "B",
+    "risk_reason": "修改 PAM 通行碼堆疊，設定錯誤可能導致無法變更通行碼或登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 common-password 為 pam_unix.so obscure yescrypt（安裝 libpam-pwquality 後為 obscure use_authtok try_first_pass yescrypt），無 remember；文件範例行缺 yescrypt，直接照抄會與 0181 衝突，修改時應保留 yescrypt。pam_unix 的歷程記錄存於 /etc/security/opasswd。0180 與 0181 都改 pam_unix 行，應共用同一個 gcb-unix profile。"
+  },
+  {
+    "id": "TWGCB-01-014-0181",
+    "category": "帳號與存取控制",
+    "title": "系統通行碼雜湊演算法",
+    "expected": "yescrypt",
+    "doc_method": "編輯 /etc/pam.d/common-password，找到 pam_unix.so 所在行新增或修改參數「yescrypt」，範例：password [success=1 default=ignore] pam_unix.so obscure use_authtok try_first_pass yescrypt；編輯 /etc/login.defs 新增或修改 ENCRYPT_METHOD yescrypt",
+    "type": "pam",
+    "params": {
+      "desc": "common-password 的 pam_unix.so 使用 yescrypt，且 login.defs ENCRYPT_METHOD 為 yescrypt",
+      "file": "/etc/pam.d/common-password",
+      "module": "pam_unix.so",
+      "arg": "yescrypt",
+      "login_defs": {
+        "key": "ENCRYPT_METHOD",
+        "value": "yescrypt",
+        "cmp": "eq"
+      }
+    },
+    "check": "(1) /etc/pam.d/common-password 未註解的 password 類型 pam_unix.so 行含 yescrypt 參數，且不含 md5/bigcrypt/sha256/sha512/blowfish/gost_yescrypt 等其他雜湊參數；(2) /etc/login.defs 未註解的 ENCRYPT_METHOD 值（不分大小寫）為 YESCRYPT。兩者皆成立即合格。",
+    "fix": "login.defs：備份 /etc/login.defs，修改或新增 ENCRYPT_METHOD YESCRYPT（login.defs 無 drop-in）。PAM：以 pam-auth-update 管理：複製 /usr/share/pam-configs/unix 為 /usr/share/pam-configs/gcb-unix，Name 改為 GCB Unix authentication、Priority 設為 257，於 Password: 與 Password-Initial: 的 pam_unix.so 參數加入 yescrypt（並移除其他雜湊參數）；備份 /etc/pam.d/common-* 與 /var/lib/pam/ 後執行 pam-auth-update --package --enable gcb-unix --disable unix（或同等的非互動方式），完成後驗證 common-auth/common-password 仍為完整可用堆疊。回滾：還原 unix profile 啟用、移除 gcb-unix 並還原備份。（替代方案：直接編輯 /etc/pam.d/common-password 的 pam_unix.so 行並備份；但之後 pam-auth-update 會因偵測到本機修改而不再自動更新該檔）。",
+    "risk": "B",
+    "risk_reason": "變更通行碼雜湊演算法與 PAM 堆疊，影響之後通行碼設定與相容性。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 common-password 已為 pam_unix.so obscure yescrypt（PAM 部分通常已合格），但 /etc/login.defs 預設 ENCRYPT_METHOD SHA512，需修改（影響 chpasswd、newusers 等工具）。login.defs 慣例為大寫 YESCRYPT，shadow 工具不分大小寫。"
+  },
+  {
+    "id": "TWGCB-01-014-0182",
+    "category": "帳號與存取控制",
+    "title": "使用者通行碼雜湊演算法",
+    "expected": "使用者所採用之通行碼雜湊演算法與系統採用之通行碼雜湊演算法一致",
+    "doc_method": "執行文件提供之 bash 腳本：以 HASH_MAP（y=yescrypt、1=md5、2=blowfish、5=SHA256、6=SHA512、g=gost-yescrypt）對照 /etc/shadow 中每個以 $ 開頭的通行碼雜湊識別碼，與 /etc/login.defs 的 ENCRYPT_METHOD 比較（不分大小寫），不一致者輸出；不一致之帳號執行 #passwd (使用者名稱) 重設通行碼",
+    "type": "custom",
+    "params": {
+      "desc": "比對 /etc/shadow 每個有效雜湊的演算法識別碼與 login.defs ENCRYPT_METHOD"
+    },
+    "check": "讀取 /etc/login.defs 的 ENCRYPT_METHOD；逐行解析 /etc/shadow，第 2 欄去除開頭的 ! 或 *（鎖定標記，可另列資訊）後若以 $ 開頭，取 $ 與下一個 $ 之間的識別碼（y→YESCRYPT、gy→GOST_YESCRYPT、1→MD5、2a/2b/2y→BCRYPT、5→SHA256、6→SHA512、7→SCRYPT），與 ENCRYPT_METHOD 不分大小寫比較；全部一致即合格，列出不一致帳號。",
+    "fix": "無法自動修復（需使用者重設通行碼）：列出不一致帳號，提示管理者通知使用者以 passwd 變更通行碼；可選擇的半自動作法為 chage -d 0 (帳號) 強制下次登入變更，但屬 B 類並需人工確認。",
+    "risk": "C",
+    "risk_reason": "需由帳號持有人重新設定通行碼，無法安全自動化。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "文件腳本有誤：gost-yescrypt 的識別碼為 gy 而非 g，blowfish 識別碼為 2a/2b/2y（腳本只取 1 個字元才剛好可用）；腳本只比對以 $ 開頭的雜湊，已鎖定（! 開頭）帳號會被略過；PDF 抽出的 sed 正規式 \"\\(. *\\)\" 中的空白為抽取雜訊，應為 \\(.*\\)。須先完成 0181 將 ENCRYPT_METHOD 改為 yescrypt，否則 Ubuntu 預設 SHA512 與實際 yescrypt 雜湊會被誤判不一致。"
+  },
+  {
+    "id": "TWGCB-01-014-0183",
+    "category": "帳號與存取控制",
+    "title": "通行碼最短使用期限",
+    "expected": "1 天以上",
+    "doc_method": "編輯 /etc/login.defs 設定 PASS_MIN_DAYS 1；針對已存在之使用者帳號執行 #chage --mindays 1 (使用者帳號名稱)",
+    "type": "login_defs",
+    "params": {
+      "key": "PASS_MIN_DAYS",
+      "value": "1",
+      "cmp": "ge",
+      "existing_users": {
+        "shadow_field": 4,
+        "cmp": "ge",
+        "value": 1
+      }
+    },
+    "check": "(1) /etc/login.defs 未註解的 PASS_MIN_DAYS 值 >= 1；(2) /etc/shadow 中具有效通行碼的帳號，第 4 欄（最短天數）>= 1（套用對象：/etc/shadow 第 2 欄為有效雜湊（以 $ 開頭，不含 ! 或 * 前綴）的帳號）。皆成立即合格。",
+    "fix": "備份 /etc/login.defs 並將 PASS_MIN_DAYS 改為 1；備份 /etc/shadow，並記錄每個需修改帳號的原第 4 欄值，對不合格帳號執行 chage --mindays 1 (帳號)。回滾：還原 login.defs，並以 chage --mindays (原值) 逐一還原。",
+    "risk": "A",
+    "risk_reason": "僅限制通行碼變更頻率，不影響登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 PASS_MIN_DAYS 0，既有帳號 shadow 第 4 欄通常為 0。"
+  },
+  {
+    "id": "TWGCB-01-014-0184",
+    "category": "帳號與存取控制",
+    "title": "通行碼最長使用期限",
+    "expected": "90 天以下，但須大於 0",
+    "doc_method": "編輯 /etc/login.defs 設定 PASS_MAX_DAYS 90；針對已存在之使用者帳號執行 #chage --maxdays 90 (使用者帳號名稱)",
+    "type": "login_defs",
+    "params": {
+      "key": "PASS_MAX_DAYS",
+      "value": "90",
+      "cmp": "range",
+      "min": 1,
+      "max": 90,
+      "existing_users": {
+        "shadow_field": 5,
+        "cmp": "range",
+        "min": 1,
+        "max": 90
+      }
+    },
+    "check": "(1) /etc/login.defs 未註解的 PASS_MAX_DAYS 值介於 1~90；(2) /etc/shadow 中具有效通行碼的帳號，第 5 欄（最長天數）介於 1~90（空值視為不合格）（套用對象：/etc/shadow 第 2 欄為有效雜湊（以 $ 開頭，不含 ! 或 * 前綴）的帳號）。",
+    "fix": "備份 /etc/login.defs 並將 PASS_MAX_DAYS 改為 90；記錄每個帳號原第 5 欄值，對不合格帳號執行 chage --maxdays 90 (帳號)。回滾：還原 login.defs，chage --maxdays (原值) 還原；原值為空時以 chage --maxdays -1 還原。",
+    "risk": "B",
+    "risk_reason": "上次變更通行碼已超過 90 天的既有帳號會立即變為通行碼過期，可能影響登入或自動化帳號。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "已實作。Ubuntu 22.04 預設 PASS_MAX_DAYS 99999。修復前應先列出「最後變更日 + 90 < 今天」的帳號供確認。"
+  },
+  {
+    "id": "TWGCB-01-014-0185",
+    "category": "帳號與存取控制",
+    "title": "通行碼到期前提醒使用者變更通行碼",
+    "expected": "14 天以上",
+    "doc_method": "編輯 /etc/login.defs 設定 PASS_WARN_AGE 14；針對已存在之使用者帳號執行 #chage --warndays 14 (使用者帳號名稱)",
+    "type": "login_defs",
+    "params": {
+      "key": "PASS_WARN_AGE",
+      "value": "14",
+      "cmp": "ge",
+      "existing_users": {
+        "shadow_field": 6,
+        "cmp": "ge",
+        "value": 14
+      }
+    },
+    "check": "(1) /etc/login.defs 未註解的 PASS_WARN_AGE 值 >= 14；(2) /etc/shadow 中具有效通行碼的帳號，第 6 欄（警告天數）>= 14（套用對象：/etc/shadow 第 2 欄為有效雜湊（以 $ 開頭，不含 ! 或 * 前綴）的帳號）。",
+    "fix": "備份 /etc/login.defs 並將 PASS_WARN_AGE 改為 14；記錄每個帳號原第 6 欄值，對不合格帳號執行 chage --warndays 14 (帳號)。回滾：還原 login.defs，chage --warndays (原值) 還原。",
+    "risk": "A",
+    "risk_reason": "僅調整到期提醒天數，不影響登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 PASS_WARN_AGE 7。"
+  },
+  {
+    "id": "TWGCB-01-014-0186",
+    "category": "帳號與存取控制",
+    "title": "通行碼到期後，帳號停用前之天數",
+    "expected": "30 天以下，但須大於 0",
+    "doc_method": "執行 #useradd -D -f 30 設定預設停用天數；針對已存在之使用者帳號執行 #chage --inactive 30 (使用者帳號名稱)",
+    "type": "custom",
+    "params": {
+      "desc": "useradd 預設 INACTIVE 介於 1~30，且既有帳號 shadow 第 7 欄介於 1~30",
+      "kv": {
+        "path": "/etc/default/useradd",
+        "key": "INACTIVE",
+        "cmp": "range",
+        "min": 1,
+        "max": 30,
+        "sep": "="
+      }
+    },
+    "check": "(1) 執行 useradd -D 取 INACTIVE= 值（或解析 /etc/default/useradd 未註解的 INACTIVE），介於 1~30；(2) /etc/shadow 中具有效通行碼的帳號第 7 欄（停用天數）介於 1~30（空值或 -1 不合格）（套用對象：/etc/shadow 第 2 欄為有效雜湊（以 $ 開頭，不含 ! 或 * 前綴）的帳號）。",
+    "fix": "備份 /etc/default/useradd 後執行 useradd -D -f 30（會寫入 INACTIVE=30）；記錄每個帳號原第 7 欄值，對不合格帳號執行 chage --inactive 30 (帳號)。回滾：還原 /etc/default/useradd，chage --inactive (原值，空值用 -1) 還原。",
+    "risk": "B",
+    "risk_reason": "通行碼已過期超過 30 天的既有帳號會立即被停用而無法登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 /etc/default/useradd 中 INACTIVE 為註解（實際值 -1，不停用）。此設定須搭配 0184 的最長使用期限才有效果。"
+  },
+  {
+    "id": "TWGCB-01-014-0187",
+    "category": "帳號與存取控制",
+    "title": "要求使用者必須經過身分鑑別才能提升權限",
+    "expected": "要求身分鑑別",
+    "doc_method": "執行 #egrep -i '(nopasswd|!authenticate)' /etc/sudoers /etc/sudoers.d/* 尋找「NOPASSWD」或「!authenticate」；以「visudo -f」編輯 /etc/sudoers 或 /etc/sudoers.d/ 下之檔案，將包含該字串的指令行予以註解(#)或刪除",
+    "type": "custom",
+    "params": {
+      "desc": "sudoers 中不得有未註解的 NOPASSWD 或 !authenticate",
+      "files": [
+        "/etc/sudoers",
+        "/etc/sudoers.d/*"
+      ]
+    },
+    "check": "讀取 /etc/sudoers 與 /etc/sudoers.d/ 下所有檔案（sudo 會略過含 . 或以 ~ 結尾的檔名，檢查時可一併列出但標示），去除註解行（以 # 開頭，但 #include/#includedir 為指令非註解），以不分大小寫比對 NOPASSWD 或 !authenticate；無符合即合格，並列出檔名與行號。",
+    "fix": "不自動修復：列出違規行供人工確認。若管理者確認，備份該檔後將該行加上 # 註解，並以 visudo -c -f (檔案) 驗證語法，失敗即還原。",
+    "risk": "C",
+    "risk_reason": "NOPASSWD 常用於自動化或雲端預設帳號（如 cloud-init 產生的 90-cloud-init-users），需人工判斷用途。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 sudo",
+    "notes": "Ubuntu 22.04 雲端映像檔預設有 /etc/sudoers.d/90-cloud-init-users 內含 NOPASSWD:ALL；註解後若該帳號沒有設定通行碼將無法使用 sudo，可能失去管理權限。文件使用的 egrep 已不建議使用，等同 grep -E。"
+  },
+  {
+    "id": "TWGCB-01-014-0188",
+    "category": "帳號與存取控制",
+    "title": "通行碼最後變更日期",
+    "expected": "通行碼最後變更日期皆為過去之日期",
+    "doc_method": "執行 awk -F: '/^[^:]+:[^!*]/{print $1}' /etc/shadow 取得帳號，逐一以 chage --list 取「Last password change」轉為 epoch 秒，大於 date +%s 者輸出；若有未來日期，執行 #passwd (使用者名稱) 變更通行碼",
+    "type": "custom",
+    "params": {
+      "desc": "/etc/shadow 第 3 欄（最後變更日）不得大於今天"
+    },
+    "check": "直接解析 /etc/shadow：第 2 欄不以 ! 或 * 開頭的帳號，第 3 欄（自 1970-01-01 起的天數）若非空，需 <= 今天（int(time.time()) // 86400）；全部成立即合格，列出未來日期帳號。",
+    "fix": "記錄違規帳號原第 3 欄值並備份 /etc/shadow，執行 chage -d $(date +%Y-%m-%d) (帳號) 將最後變更日設為今天（不變更通行碼）；或依文件請使用者以 passwd 重設。回滾：chage -d (原天數) 還原。",
+    "risk": "B",
+    "risk_reason": "會修改帳號通行碼時效資料，可能影響通行碼到期計算。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "文件以 passwd 重設通行碼修正，無法自動化，本規格改用 chage -d 更新日期作為可回滾的替代；若要嚴格依文件，應改為 C 類只回報。直接解析 shadow 可避免 chage --list 輸出受語系影響（文件 grep '^Last password change' 在非英文語系會失效）。第 3 欄為 0 表示強制下次登入變更，不是未來日期。"
+  },
+  {
+    "id": "TWGCB-01-014-0189",
+    "category": "帳號與存取控制",
+    "title": "系統帳號登入方式",
+    "expected": "nologin",
+    "doc_method": "(1) 設定系統帳號（sync、shutdown 及 halt 除外）不可使用殼層登入：#awk -F: '($1!=\"root\" && $1!=\"sync\" && $1!=\"shutdown\" && $1!=\"halt\" && $1!~/^\\+/ && $3<'\"$(awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs)\"' && $7!=\"'\"$(which nologin)\"'\" && $7!=\"/bin/false\") {print $1}' /etc/passwd | while read user; do usermod -s $(which nologin) $user; done；(2) 鎖定所有非 root 之系統帳號：#awk -F: '($1!=\"root\" && $1!~/^\\+/ && $3<'\"$(awk '/^\\s*UID_MIN/{print $2}' /etc/login.defs)\"') {print $1}' /etc/passwd | xargs -I '{}' passwd -S '{}' | awk '($2!=\"L\" && $2!=\"LK\") {print $1}' | while read user; do usermod -L $user; done",
+    "type": "custom",
+    "params": {
+      "desc": "UID < UID_MIN 的非 root 系統帳號 shell 為 nologin/false 且已鎖定",
+      "exclude_shell": [
+        "root",
+        "sync",
+        "shutdown",
+        "halt"
+      ],
+      "exclude_lock": [
+        "root"
+      ]
+    },
+    "check": "從 /etc/login.defs 取 UID_MIN（預設 1000）；解析 /etc/passwd，跳過以 + 開頭的 NIS 項目：(1) UID < UID_MIN 且帳號不是 root/sync/shutdown/halt 者，第 7 欄需為 /usr/sbin/nologin、/sbin/nologin、/bin/false 或 /usr/bin/false；(2) UID < UID_MIN 的非 root 帳號，/etc/shadow 第 2 欄需以 ! 或 * 開頭（等同 passwd -S 狀態 L）。皆成立即合格，列出違規帳號。",
+    "fix": "不建議全自動：列出違規帳號供人工確認後，備份 /etc/passwd 與 /etc/shadow，記錄每個帳號原 shell 與鎖定狀態，執行 usermod -s /usr/sbin/nologin (帳號) 與 usermod -L (帳號)。回滾：usermod -s (原 shell)、usermod -U（僅對原本未鎖定者）。",
+    "risk": "C",
+    "risk_reason": "部分服務帳號（如 postgres 等）需要可用 shell 供 su 或維運作業，需人工判斷帳號用途。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 nologin 路徑為 /usr/sbin/nologin（which nologin 結果），因 usrmerge /sbin/nologin 也可用；Ubuntu 預設 sync 帳號 shell 為 /bin/sync。文件第 2 段鎖定指令未排除 sync/shutdown/halt，與第 1 段不一致；passwd -S 在 Ubuntu 的鎖定狀態為 L（LK 為 RHEL 格式）。系統帳號在 shadow 多為 * 已視為鎖定，usermod -L 會在前面加 !，無害。"
+  },
+  {
+    "id": "TWGCB-01-014-0190",
+    "category": "帳號與存取控制",
+    "title": "Bash shell 閒置時登出時間",
+    "expected": "900 秒以下，但須大於 0",
+    "doc_method": "編輯 /etc/bash.bashrc 或 /etc/profile 或 /etc/profile.d/ 目錄下的「.sh」檔案，新增或修改：readonly TMOUT=900 ; export TMOUT",
+    "type": "custom",
+    "params": {
+      "desc": "全域 shell 設定檔設定 TMOUT 1~900 並 readonly、export",
+      "files": [
+        "/etc/bash.bashrc",
+        "/etc/profile",
+        "/etc/profile.d/*.sh"
+      ],
+      "key": "TMOUT",
+      "min": 1,
+      "max": 900
+    },
+    "check": "掃描 /etc/bash.bashrc、/etc/profile、/etc/profile.d/*.sh 未註解行，找出 TMOUT 指派（含 TMOUT=N、readonly TMOUT=N、export TMOUT=N、declare -r TMOUT=N）：至少一處設定，所有設定值皆介於 1~900，且有 readonly 與 export。另檢查 /etc/profile.d 外的任何設定值皆不得 > 900。",
+    "fix": "建立 drop-in /etc/profile.d/99-gcb-tmout.sh（root:root 644），內容：TMOUT=900 檢查後 readonly TMOUT=900 ; export TMOUT（以 [ -z \"${TMOUT+x}\" ] 或檢查是否已 readonly 避免重複 readonly 報錯）；若其他檔案有 >900 的值，備份後註解掉。因 /etc/profile.d 僅登入 shell 讀取，若需涵蓋非登入互動 shell，另在 /etc/bash.bashrc 加入以標記包住的同樣設定（備份原檔）。回滾：刪除 drop-in、還原備份。",
+    "risk": "A",
+    "risk_reason": "僅使閒置的互動 shell 自動登出，不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "TMOUT 只在 bash 前景等待輸入時生效；同一 shell 重複執行 readonly TMOUT=900 會出現「readonly variable」錯誤訊息，需避免多個檔案重複設定。Ubuntu 22.04 預設未設定 TMOUT。"
+  },
+  {
+    "id": "TWGCB-01-014-0191",
+    "category": "帳號與存取控制",
+    "title": "root 帳號所屬群組",
+    "expected": "GID 0",
+    "doc_method": "執行 #usermod -g 0 root 設定 root 帳號所屬群組",
+    "type": "custom",
+    "params": {
+      "desc": "/etc/passwd 中 root 的第 4 欄（主要 GID）為 0"
+    },
+    "check": "解析 /etc/passwd 中帳號名為 root 的行，第 4 欄 GID == 0 即合格。",
+    "fix": "備份 /etc/passwd 並記錄原 GID，執行 usermod -g 0 root。回滾：usermod -g (原 GID) root。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 預設即為 GID 0，修正不影響登入。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 root 主要群組即為 GID 0，通常已合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0192",
+    "category": "帳號與存取控制",
+    "title": "所有使用者帳號之預設 umask",
+    "expected": "027 或更低權限",
+    "doc_method": "編輯 /etc/profile、/etc/profile.d/ 目錄下的「.sh」檔案及 /etc/bash.bashrc，新增或修改：umask 027",
+    "type": "custom",
+    "params": {
+      "desc": "全域 shell 設定檔中 umask 皆不寬於 027",
+      "files": [
+        "/etc/profile",
+        "/etc/profile.d/*.sh",
+        "/etc/bash.bashrc"
+      ],
+      "value": "027"
+    },
+    "check": "掃描 /etc/profile、/etc/profile.d/*.sh、/etc/bash.bashrc 未註解的 umask 指令（八進位形式，如 umask 027 / umask 0027；符號形式如 u=rwx,g=rx,o= 需轉換）：至少有一處設定，且每個設定值 v 皆滿足 (v & 0o027) == 0o027 即合格（即不比 027 寬鬆）。輔助資訊：/etc/login.defs 的 UMASK（Ubuntu 預設 022，供 pam_umask 使用）一併列出。",
+    "fix": "建立 drop-in /etc/profile.d/99-gcb-umask.sh（root:root 644），內容 umask 027；在 /etc/bash.bashrc 末端加入以標記註解包住的 umask 027（先備份）；若其他檔案有較寬鬆的 umask，備份後改為 027。回滾：刪除 drop-in、還原備份檔。",
+    "risk": "A",
+    "risk_reason": "僅影響互動 shell 新建檔案的預設權限。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設這三處都沒有設定 umask，實際 umask 來自 pam_umask 讀取 /etc/login.defs 的 UMASK 022；文件只要求 shell 檔案，是否同時調整 login.defs UMASK 027 需決定（建議一併設定，可涵蓋非 bash 登入）。「027 或更低權限」指限制不少於 027。"
+  },
+  {
+    "id": "TWGCB-01-014-0193",
+    "category": "帳號與存取控制",
+    "title": "可使用 su 指令之群組",
+    "expected": "僅限 sugroup 群組才能使用 su 指令",
+    "doc_method": "執行 groupadd sugroup 新增 sugroup 群組；編輯 /etc/pam.d/su，設定：auth required pam_wheel.so use_uid group=sugroup",
+    "type": "pam",
+    "params": {
+      "desc": "存在 sugroup 群組，且 /etc/pam.d/su 有未註解的 auth required pam_wheel.so use_uid group=sugroup",
+      "file": "/etc/pam.d/su",
+      "group": "sugroup"
+    },
+    "check": "(1) /etc/group 存在 sugroup；(2) /etc/pam.d/su 有未註解的 auth 行，控制旗標為 required（或 requisite），模組為 pam_wheel.so，參數含 use_uid 與 group=sugroup，且位於 pam_rootok.so 之後、其他 sufficient 認證模組之前。皆成立即合格。",
+    "fix": "若 sugroup 不存在則 groupadd sugroup（記錄為本工具建立，回滾時 groupdel）；備份 /etc/pam.d/su，在 auth sufficient pam_rootok.so 行之後插入 auth required pam_wheel.so use_uid group=sugroup（若已有註解的 pam_wheel.so 行則保留原行不動）。回滾：還原 /etc/pam.d/su 並刪除新建群組。",
+    "risk": "B",
+    "risk_reason": "啟用後非 sugroup 成員（含管理者）都無法使用 su，可能影響維運流程。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 /etc/pam.d/su 預設有註解的 # auth required pam_wheel.so，且 Ubuntu 預設沒有 root 通行碼、主要以 sudo 管理，影響通常較小；/etc/pam.d/su 不由 pam-auth-update 管理，可直接編輯。sugroup 建議保持空群組（CIS 作法），是否加入成員需人工決定。"
+  }
+]

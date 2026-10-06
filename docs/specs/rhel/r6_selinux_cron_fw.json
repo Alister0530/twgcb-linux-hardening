@@ -1,0 +1,1182 @@
+[
+ {
+  "key": "selinux_pkg",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0185",
+   "rhel9": "TWGCB-01-012-0183"
+  },
+  "category": "SELinux",
+  "title": "SELinux 套件",
+  "expected": "安裝",
+  "doc_method": "#dnf install libselinux",
+  "version_diff": "",
+  "type": "package_present",
+  "params": {
+   "pkg": "libselinux"
+  },
+  "check": "rpm -q libselinux 回傳 0 即合格。",
+  "fix": "dnf -y install libselinux。備份：記錄原本未安裝；回滾＝dnf remove libselinux（實務上不應回滾，libselinux 為核心相依套件，幾乎不可能未安裝）。",
+  "risk": "A",
+  "risk_reason": "僅安裝基礎函式庫，不改變 SELinux 模式。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "libselinux 為 systemd、coreutils 等相依套件，RHEL/Rocky/Alma 最小安裝即存在；實際管理工具在 policycoreutils、selinux-policy-targeted，可一併檢查但非 GCB 要求。"
+ },
+ {
+  "key": "selinux_bootloader",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0186",
+   "rhel9": "TWGCB-01-012-0184"
+  },
+  "category": "SELinux",
+  "title": "開機載入程式啟用 SELinux",
+  "expected": "啟用",
+  "doc_method": "編輯 /etc/default/grub，移除所有 CMDLINE_LINUX 參數中的「selinux=0」與「enforcing=0」，例如 GRUB_CMDLINE_LINUX_DEFAULT=\"quiet\"、GRUB_CMDLINE_LINUX=\"\"；再執行 #grub2-mkconfig -o \"$(dirname \"$(find /boot -type f \\( -name 'grubenv' -o -name 'grub.conf' -o -name 'grub.cfg' \\) -exec grep -Pl '^\\h*(kernelopts=|linux|kernel)' {} \\;)\")/grub.cfg\"",
+  "version_diff": "",
+  "type": "grub_arg",
+  "params": {
+   "absent_args": [
+    "selinux=0",
+    "enforcing=0"
+   ],
+   "compare": "absent"
+  },
+  "check": "三處皆不得出現 selinux=0 或 enforcing=0：(1) grubby --info=ALL 的每個 args= 行；(2) /etc/default/grub 的 GRUB_CMDLINE_LINUX 與 GRUB_CMDLINE_LINUX_DEFAULT；(3) RHEL 8 的 grub2-editenv list 中 kernelopts=（BLS 項目若引用 $kernelopts）。另讀 /proc/cmdline 判斷目前開機是否仍帶參數（若有則回報『已修正、待重開機』）。",
+  "fix": "備份 /etc/default/grub、/boot/loader/entries/*.conf、grubenv（grub2-editenv list 輸出）。執行 grubby --update-kernel=ALL --remove-args=\"selinux=0 enforcing=0\"，並以文字編輯移除 /etc/default/grub 中的兩個參數（保留其他參數），讓未來新核心也不帶參數；不需 grub2-mkconfig（BLS 由 grubby 維護）。若原本帶 selinux=0（SELinux 完全停用），移除後下次開機 SELinux 會啟用，必須同時：touch /.autorelabel（或 fixfiles -F onboot）並暫將 /etc/selinux/config 設為 SELINUX=permissive，重開機完成重新標記後再由 selinux_state 規則切到 enforcing；否則可能因檔案未標記導致服務失敗甚至無法登入。回滾：還原上述備份檔（或 grubby --update-kernel=ALL --args=\"<原參數>\"），刪除 /.autorelabel。",
+  "risk": "B",
+  "risk_reason": "修改開機參數且可能讓原本停用的 SELinux 在重開機後啟用，需重新標記檔案系統。",
+  "needs_reboot": true,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件以 grub2-mkconfig 重建 grub.cfg，在 RHEL 8/9 BLS 架構下參數實際存於 /boot/loader/entries/*.conf（RHEL 8 多經 grubenv 的 kernelopts），應以 grubby 修改所有項目。RHEL 9 起 /etc/selinux/config 的 SELINUX=disabled 不再於核心層停用 SELinux，完全停用只能靠 selinux=0，因此 RHEL 9 上此項目特別重要。"
+ },
+ {
+  "key": "selinux_policy_type",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0187",
+   "rhel9": "TWGCB-01-012-0185"
+  },
+  "category": "SELinux",
+  "title": "SELinux 政策",
+  "expected": "targeted 或更嚴格之政策",
+  "doc_method": "編輯 /etc/selinux/config，設定 SELINUXTYPE=targeted",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/selinux/config",
+   "key": "SELINUXTYPE",
+   "value": [
+    "targeted",
+    "mls"
+   ],
+   "compare": "in",
+   "sep": "="
+  },
+  "check": "讀取 /etc/selinux/config 的 SELINUXTYPE（最後一個有效行），值為 targeted 或 mls 即合格；若 SELinux 已啟用，另以 sestatus 的「Loaded policy name」確認目前載入政策一致（不一致時回報待重開機）。minimum 或其他自訂值為不合格。",
+  "fix": "備份 /etc/selinux/config。確認已安裝 selinux-policy-targeted（未安裝則 dnf install，屬政策本身非防火牆套件）；把 SELINUXTYPE 改為 targeted（不把 mls 改回 targeted）。若原值不同於 targeted，切換政策需 touch /.autorelabel 並重開機重新標記；SELinux 處於 enforcing 時建議先切 permissive 再重開。回滾：還原 /etc/selinux/config，若已建立 /.autorelabel 則刪除，或再次重新標記後重開機。",
+  "risk": "B",
+  "risk_reason": "變更政策類型需重新標記整個檔案系統並重開機。",
+  "needs_reboot": true,
+  "applies_when": "SELinux 未被 selinux=0 完全停用時檢查設定檔；一律適用",
+  "existing": false,
+  "notes": "文件把 minimum 列為可選政策，但 minimum 比 targeted 寬鬆，不符合「targeted 或更嚴格」，應判不合格。mls 需另裝 selinux-policy-mls，且多數伺服器不適用，工具不應主動改為 mls。"
+ },
+ {
+  "key": "selinux_state",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0188",
+   "rhel9": "TWGCB-01-012-0186"
+  },
+  "category": "SELinux",
+  "title": "SELinux 啟用狀態",
+  "expected": "enforcing",
+  "doc_method": "編輯 /etc/selinux/config，設定 SELINUX=enforcing；執行 #setenforce 1",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/selinux/config",
+   "key": "SELINUX",
+   "value": "enforcing",
+   "compare": "eq",
+   "sep": "=",
+   "runtime_check": "getenforce == Enforcing"
+  },
+  "check": "兩處皆須合格：(1) /etc/selinux/config 中 SELINUX=enforcing（開機後生效）；(2) getenforce 輸出 Enforcing（目前生效）。若 config 正確但目前為 Permissive，可即時修正；若目前為 Disabled，回報『待重新標記並重開機』。",
+  "fix": "備份 /etc/selinux/config。依目前狀態：(a) Permissive → 改 config 為 enforcing 並 setenforce 1，無需重開機；修正前先以 ausearch -m AVC -ts boot（或 journalctl）檢查近期 denial，有大量 denial 時提示風險。(b) Disabled（或核心參數 selinux=0）→ 不可直接 setenforce；先移除核心參數（見 selinux_bootloader）、config 設 SELINUX=permissive、touch /.autorelabel，重開機完成重新標記後，再次執行本工具確認無異常 AVC 再設為 enforcing（兩階段）。回滾：還原 config，setenforce 0；已建立的 /.autorelabel 可刪除。",
+  "risk": "B",
+  "risk_reason": "切換為強制模式可能使未正確標記的服務被拒絕存取，從 disabled 啟用需重新標記並重開機。",
+  "needs_reboot": true,
+  "applies_when": "一律",
+  "existing": true,
+  "notes": "needs_reboot 僅在原狀態為 Disabled 時成立；Permissive → Enforcing 可即時生效。RHEL 9 中 config 寫 disabled 時核心仍啟用 SELinux 但不載入政策，getenforce 仍顯示 Disabled，處理方式相同。"
+ },
+ {
+  "key": "selinux_unconfined",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0189",
+   "rhel9": "TWGCB-01-012-0187"
+  },
+  "category": "SELinux",
+  "title": "未受限程序",
+  "expected": "無未受限程序",
+  "doc_method": "#ps -eZf | grep unconfined_service_t | grep -v grep 檢查；若有，以 chcon 改為非 unconfined_service_t 的區域，例如 #chcon -t httpd_exec_t /usr/sbin/httpd",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "description": "掃描執行中程序的 SELinux 安全內容是否為 unconfined_service_t"
+  },
+  "check": "SELinux 未啟用時判為不合格（相依 selinux_state）。讀取 /proc/[0-9]*/attr/current（或 ps -eZo label,pid,comm），列出 type 欄為 unconfined_service_t 的程序與其執行檔路徑（/proc/PID/exe）；無任何此類程序即合格，否則列出清單。",
+  "fix": "不自動修復，只輸出清單與建議：以 ls -Z 查看執行檔標籤，通常是放在 /opt、/usr/local 等位置標為 bin_t 的第三方服務；應由管理者為該服務選擇正確類型，以 semanage fcontext -a -t <type> '<路徑>' 加 restorecon -v <路徑> 永久設定，或撰寫自訂政策模組，再重啟該服務。",
+  "risk": "C",
+  "risk_reason": "需人工判斷每個服務應使用哪個 SELinux 類型，錯誤標籤會讓服務無法啟動。",
+  "needs_reboot": false,
+  "applies_when": "SELinux 已啟用",
+  "existing": false,
+  "notes": "文件以 chcon 為例，但 chcon 為暫時性標籤，restorecon 或重新標記後會被還原，應改用 semanage fcontext；且範例 /usr/sbin/httpd 在正常系統本就標為 httpd_exec_t，只是示意。"
+ },
+ {
+  "key": "setroubleshoot_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0190",
+   "rhel9": "TWGCB-01-012-0188"
+  },
+  "category": "SELinux",
+  "title": "setroubleshoot 套件",
+  "expected": "移除",
+  "doc_method": "#dnf remove setroubleshoot",
+  "version_diff": "",
+  "type": "package_absent",
+  "params": {
+   "pkg": "setroubleshoot"
+  },
+  "check": "rpm -q setroubleshoot 回傳非 0 即合格；同時回報 setroubleshoot-server 是否安裝（資訊用途）。",
+  "fix": "先以 dnf remove --assumeno setroubleshoot（或 rpm -e --test）列出會連帶移除的套件，只有 setroubleshoot 自身（及其不再需要的相依）時才執行 dnf -y remove setroubleshoot；若會移除 cockpit-* 等其他套件則改為人工處理。備份：記錄套件版本；回滾＝dnf install setroubleshoot（需可用的套件庫）。",
+  "risk": "A",
+  "risk_reason": "移除診斷用工具，不影響 SELinux 實際執行。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 setroubleshoot",
+  "existing": false,
+  "notes": "伺服器上常見的是 setroubleshoot-server（含 setroubleshootd），文件只寫 setroubleshoot；可考慮一併提示，但以 GCB 原文為判定依據。"
+ },
+ {
+  "key": "mcstrans_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0191",
+   "rhel9": "TWGCB-01-012-0189"
+  },
+  "category": "SELinux",
+  "title": "mcstrans 套件",
+  "expected": "移除",
+  "doc_method": "#dnf remove mcstrans",
+  "version_diff": "",
+  "type": "package_absent",
+  "params": {
+   "pkg": "mcstrans"
+  },
+  "check": "rpm -q mcstrans 回傳非 0 即合格。",
+  "fix": "dnf -y remove mcstrans（會一併停止 mcstransd）。備份：記錄套件版本與 mcstrans 服務啟用狀態；回滾＝dnf install mcstrans 並還原服務狀態。",
+  "risk": "A",
+  "risk_reason": "移除不常用的標籤轉譯服務，不影響存取控制。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 mcstrans",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "crond_enabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0192",
+   "rhel9": "TWGCB-01-012-0190"
+  },
+  "category": "cron 設定",
+  "title": "cron 守護程序",
+  "expected": "啟用",
+  "doc_method": "#systemctl --now enable crond",
+  "version_diff": "",
+  "type": "service_enabled",
+  "params": {
+   "unit": "crond.service",
+   "pkg": "cronie"
+  },
+  "check": "systemctl is-enabled crond 為 enabled 且 systemctl is-active crond 為 active 即合格；未安裝 cronie 為不合格。",
+  "fix": "若未安裝 cronie 則 dnf install cronie；systemctl unmask（若被遮蔽）並 systemctl --now enable crond。備份：記錄原 enabled/active/masked 狀態；回滾＝依原狀態 disable/stop/mask。",
+  "risk": "A",
+  "risk_reason": "啟用系統排程服務，不影響登入與網路。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "crontab_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0193",
+   "rhel9": "TWGCB-01-012-0191"
+  },
+  "category": "cron 設定",
+  "title": "/etc/crontab 檔案所有權",
+  "expected": "root:root",
+  "doc_method": "#chown root:root /etc/crontab",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/crontab"
+   ],
+   "owner": "root",
+   "groups": [
+    "root"
+   ],
+   "max_mode": null,
+   "recursive": false
+  },
+  "check": "stat /etc/crontab，uid 0 且 gid 0 即合格；檔案不存在時視為不合格（cronie 預設會建立）。",
+  "fix": "記錄原 uid/gid 後 chown root:root /etc/crontab；回滾＝chown 回原值。",
+  "risk": "A",
+  "risk_reason": "僅變更檔案所有權。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "crontab_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0194",
+   "rhel9": "TWGCB-01-012-0192"
+  },
+  "category": "cron 設定",
+  "title": "/etc/crontab 檔案權限",
+  "expected": "600 或更低權限",
+  "doc_method": "#chmod 600 /etc/crontab",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/crontab"
+   ],
+   "owner": null,
+   "groups": null,
+   "max_mode": "0600",
+   "recursive": false
+  },
+  "check": "stat /etc/crontab，權限位元不得超出 0600（mode & ~0600 == 0）即合格。",
+  "fix": "記錄原權限後 chmod 600 /etc/crontab（若原本更嚴格則不動）；回滾＝chmod 回原權限。",
+  "risk": "A",
+  "risk_reason": "僅收緊檔案權限，crond 以 root 讀取不受影響。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": "RHEL 預設為 0644，多數系統首次檢測會不合格。"
+ },
+ {
+  "key": "cron_hourly_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0195",
+   "rhel9": "TWGCB-01-012-0193"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.hourly 目錄所有權",
+  "expected": "root:root",
+  "doc_method": "#chown root:root /etc/cron.hourly",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.hourly"
+   ],
+   "owner": "root",
+   "groups": [
+    "root"
+   ],
+   "max_mode": null,
+   "recursive": false
+  },
+  "check": "stat /etc/cron.hourly（目錄本身，不遞迴），uid 0 且 gid 0 即合格；目錄不存在時視為不合格。",
+  "fix": "記錄原 uid/gid 後 chown root:root /etc/cron.hourly；回滾＝chown 回原值。",
+  "risk": "A",
+  "risk_reason": "僅變更目錄所有權。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "cron_hourly_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0196",
+   "rhel9": "TWGCB-01-012-0194"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.hourly 目錄權限",
+  "expected": "700 或更低權限",
+  "doc_method": "#chmod 700 /etc/cron.hourly",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.hourly"
+   ],
+   "owner": null,
+   "groups": null,
+   "max_mode": "0700",
+   "recursive": false
+  },
+  "check": "stat /etc/cron.hourly（目錄本身，不遞迴），權限位元不得超出 0700 即合格。",
+  "fix": "記錄原權限後 chmod 700 /etc/cron.hourly（原本更嚴格則不動）；回滾＝chmod 回原權限。",
+  "risk": "A",
+  "risk_reason": "僅收緊目錄權限，run-parts 以 root 執行不受影響。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": "RHEL 預設為 0755，首次檢測通常不合格。"
+ },
+ {
+  "key": "cron_daily_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0197",
+   "rhel9": "TWGCB-01-012-0195"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.daily 目錄所有權",
+  "expected": "root:root",
+  "doc_method": "#chown root:root /etc/cron.daily",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.daily"
+   ],
+   "owner": "root",
+   "groups": [
+    "root"
+   ],
+   "max_mode": null,
+   "recursive": false
+  },
+  "check": "stat /etc/cron.daily（目錄本身，不遞迴），uid 0 且 gid 0 即合格；目錄不存在時視為不合格。",
+  "fix": "記錄原 uid/gid 後 chown root:root /etc/cron.daily；回滾＝chown 回原值。",
+  "risk": "A",
+  "risk_reason": "僅變更目錄所有權。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "cron_daily_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0198",
+   "rhel9": "TWGCB-01-012-0196"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.daily 目錄權限",
+  "expected": "700 或更低權限",
+  "doc_method": "#chmod 700 /etc/cron.daily",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.daily"
+   ],
+   "owner": null,
+   "groups": null,
+   "max_mode": "0700",
+   "recursive": false
+  },
+  "check": "stat /etc/cron.daily（目錄本身，不遞迴），權限位元不得超出 0700 即合格。",
+  "fix": "記錄原權限後 chmod 700 /etc/cron.daily（原本更嚴格則不動）；回滾＝chmod 回原權限。",
+  "risk": "A",
+  "risk_reason": "僅收緊目錄權限，run-parts 以 root 執行不受影響。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": "RHEL 預設為 0755，首次檢測通常不合格。"
+ },
+ {
+  "key": "cron_weekly_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0199",
+   "rhel9": "TWGCB-01-012-0197"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.weekly 目錄所有權",
+  "expected": "root:root",
+  "doc_method": "#chown root:root /etc/cron.weekly",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.weekly"
+   ],
+   "owner": "root",
+   "groups": [
+    "root"
+   ],
+   "max_mode": null,
+   "recursive": false
+  },
+  "check": "stat /etc/cron.weekly（目錄本身，不遞迴），uid 0 且 gid 0 即合格；目錄不存在時視為不合格。",
+  "fix": "記錄原 uid/gid 後 chown root:root /etc/cron.weekly；回滾＝chown 回原值。",
+  "risk": "A",
+  "risk_reason": "僅變更目錄所有權。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "cron_weekly_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0200",
+   "rhel9": "TWGCB-01-012-0198"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.weekly 目錄權限",
+  "expected": "700 或更低權限",
+  "doc_method": "#chmod 700 /etc/cron.weekly",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.weekly"
+   ],
+   "owner": null,
+   "groups": null,
+   "max_mode": "0700",
+   "recursive": false
+  },
+  "check": "stat /etc/cron.weekly（目錄本身，不遞迴），權限位元不得超出 0700 即合格。",
+  "fix": "記錄原權限後 chmod 700 /etc/cron.weekly（原本更嚴格則不動）；回滾＝chmod 回原權限。",
+  "risk": "A",
+  "risk_reason": "僅收緊目錄權限，run-parts 以 root 執行不受影響。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": "RHEL 預設為 0755，首次檢測通常不合格。"
+ },
+ {
+  "key": "cron_monthly_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0201",
+   "rhel9": "TWGCB-01-012-0199"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.monthly 目錄所有權",
+  "expected": "root:root",
+  "doc_method": "#chown root:root /etc/cron.monthly",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.monthly"
+   ],
+   "owner": "root",
+   "groups": [
+    "root"
+   ],
+   "max_mode": null,
+   "recursive": false
+  },
+  "check": "stat /etc/cron.monthly（目錄本身，不遞迴），uid 0 且 gid 0 即合格；目錄不存在時視為不合格。",
+  "fix": "記錄原 uid/gid 後 chown root:root /etc/cron.monthly；回滾＝chown 回原值。",
+  "risk": "A",
+  "risk_reason": "僅變更目錄所有權。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "cron_monthly_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0202",
+   "rhel9": "TWGCB-01-012-0200"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.monthly 目錄權限",
+  "expected": "700 或更低權限",
+  "doc_method": "#chmod 700 /etc/cron.monthly",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.monthly"
+   ],
+   "owner": null,
+   "groups": null,
+   "max_mode": "0700",
+   "recursive": false
+  },
+  "check": "stat /etc/cron.monthly（目錄本身，不遞迴），權限位元不得超出 0700 即合格。",
+  "fix": "記錄原權限後 chmod 700 /etc/cron.monthly（原本更嚴格則不動）；回滾＝chmod 回原權限。",
+  "risk": "A",
+  "risk_reason": "僅收緊目錄權限，run-parts 以 root 執行不受影響。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": "RHEL 預設為 0755，首次檢測通常不合格。"
+ },
+ {
+  "key": "cron_d_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0203",
+   "rhel9": "TWGCB-01-012-0201"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.d 目錄所有權",
+  "expected": "root:root",
+  "doc_method": "#chown root:root /etc/cron.d",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.d"
+   ],
+   "owner": "root",
+   "groups": [
+    "root"
+   ],
+   "max_mode": null,
+   "recursive": false
+  },
+  "check": "stat /etc/cron.d（目錄本身，不遞迴），uid 0 且 gid 0 即合格；目錄不存在時視為不合格。",
+  "fix": "記錄原 uid/gid 後 chown root:root /etc/cron.d；回滾＝chown 回原值。",
+  "risk": "A",
+  "risk_reason": "僅變更目錄所有權。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "cron_d_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0204",
+   "rhel9": "TWGCB-01-012-0202"
+  },
+  "category": "cron 設定",
+  "title": "/etc/cron.d 目錄權限",
+  "expected": "700 或更低權限",
+  "doc_method": "#chmod 700 /etc/cron.d",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/cron.d"
+   ],
+   "owner": null,
+   "groups": null,
+   "max_mode": "0700",
+   "recursive": false
+  },
+  "check": "stat /etc/cron.d（目錄本身，不遞迴），權限位元不得超出 0700 即合格。",
+  "fix": "記錄原權限後 chmod 700 /etc/cron.d（原本更嚴格則不動）；回滾＝chmod 回原權限。",
+  "risk": "A",
+  "risk_reason": "僅收緊目錄權限，run-parts 以 root 執行不受影響。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": "RHEL 預設為 0755，首次檢測通常不合格。"
+ },
+ {
+  "key": "cron_at_allow_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0205",
+   "rhel9": "TWGCB-01-012-0203"
+  },
+  "category": "cron 設定",
+  "title": "at.allow 與 cron.allow 檔案所有權",
+  "expected": "root:root",
+  "doc_method": "#rm /etc/cron.deny #rm /etc/at.deny #touch /etc/cron.allow #touch /etc/at.allow #chown root:root /etc/cron.allow #chown root:root /etc/at.allow",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "absent": [
+    "/etc/cron.deny",
+    "/etc/at.deny"
+   ],
+   "present": [
+    "/etc/cron.allow",
+    "/etc/at.allow"
+   ],
+   "owner": "root",
+   "group": "root"
+  },
+  "check": "四項皆成立才合格：/etc/cron.deny 不存在、/etc/at.deny 不存在、/etc/cron.allow 存在且 uid/gid 為 0、/etc/at.allow 存在且 uid/gid 為 0。",
+  "fix": "先列出目前擁有排程的非 root 使用者（/var/spool/cron/* 檔名、atq 結果）與 deny 檔內容並提示；備份 /etc/cron.deny、/etc/at.deny（含權限）後刪除；若 allow 檔不存在則建立空檔，chown root:root。與 cron_at_allow_perm 共用同一修復流程。回滾：還原兩個 deny 檔，刪除本工具新建的 allow 檔（原本已存在的則還原所有權）。",
+  "risk": "B",
+  "risk_reason": "建立空的 allow 檔後，除 root 外所有使用者都無法再使用 crontab/at 建立或修改排程。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie（at.* 部分在未安裝 at 套件時仍照文件建立檔案）",
+  "existing": false,
+  "notes": "是否把既有排程使用者加入 cron.allow 屬人工判斷，工具只列出名單不自動加入。"
+ },
+ {
+  "key": "cron_at_allow_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0206",
+   "rhel9": "TWGCB-01-012-0204"
+  },
+  "category": "cron 設定",
+  "title": "at.allow 與 cron.allow 檔案權限",
+  "expected": "600 或更低權限",
+  "doc_method": "#rm /etc/cron.deny #rm /etc/at.deny #touch /etc/cron.allow #touch /etc/at.allow #chmod 600 /etc/cron.allow #chmod 600 /etc/at.allow",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "absent": [
+    "/etc/cron.deny",
+    "/etc/at.deny"
+   ],
+   "present": [
+    "/etc/cron.allow",
+    "/etc/at.allow"
+   ],
+   "max_mode": "0600"
+  },
+  "check": "四項皆成立才合格：/etc/cron.deny、/etc/at.deny 不存在，/etc/cron.allow、/etc/at.allow 存在且權限不超出 0600。",
+  "fix": "同 cron_at_allow_owner 的流程（備份並刪除 deny 檔、建立 allow 檔），再 chmod 600 兩個 allow 檔（原本更嚴格則不動）。回滾：還原 deny 檔、還原或刪除 allow 檔。",
+  "risk": "B",
+  "risk_reason": "與所有權項目相同，會限制非 root 使用者使用排程。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 cronie",
+  "existing": false,
+  "notes": "兩個項目的修復步驟完全重疊，實作上可合併為一個修復動作並同時更新兩項結果。"
+ },
+ {
+  "key": "cron_logging",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0207",
+   "rhel9": "TWGCB-01-012-0205"
+  },
+  "category": "cron 設定",
+  "title": "cron 日誌記錄功能",
+  "expected": "啟用",
+  "doc_method": "#grep cron /etc/rsyslog.conf /etc/rsyslog.d/*.conf 檢查；若無，於 /etc/rsyslog.conf 或 /etc/rsyslog.d/ 下的檔案新增 cron.* /var/log/cron，再 #systemctl restart rsyslog.service",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "files": [
+    "/etc/rsyslog.conf",
+    "/etc/rsyslog.d/*.conf"
+   ],
+   "line": "cron.* /var/log/cron",
+   "dropin": "/etc/rsyslog.d/50-gcb-cron.conf"
+  },
+  "check": "解析 /etc/rsyslog.conf 與 /etc/rsyslog.d/*.conf 的非註解行，找到選擇器含 cron.*（允許與其他選擇器以分號並列，如 *.info;cron.none 不算）且動作為 /var/log/cron（可帶 - 前綴）的行即合格；並確認 rsyslog 服務 active。",
+  "fix": "新增 drop-in /etc/rsyslog.d/50-gcb-cron.conf，內容 cron.*    /var/log/cron；以 rsyslogd -N1 驗證語法，通過後 systemctl restart rsyslog。回滾：刪除該 drop-in 並重啟 rsyslog。",
+  "risk": "A",
+  "risk_reason": "僅新增日誌規則。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 rsyslog",
+  "existing": false,
+  "notes": "RHEL 8/9 預設 /etc/rsyslog.conf 已含 cron.* /var/log/cron，通常直接合格。只用 journald 而未安裝 rsyslog 的系統應判為不適用或不合格並提示。"
+ },
+ {
+  "key": "firewalld_pkg",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0244",
+   "rhel9": "TWGCB-01-012-0242"
+  },
+  "category": "Firewalld 配置",
+  "title": "firewalld 防火牆套件",
+  "expected": "安裝",
+  "doc_method": "#dnf install firewalld",
+  "version_diff": "",
+  "type": "package_present",
+  "params": {
+   "pkg": "firewalld"
+  },
+  "check": "rpm -q firewalld 回傳 0 即合格。",
+  "fix": "dnf -y install firewalld（只安裝、不啟用；啟用由 firewalld_enabled 處理）。備份：記錄原本未安裝；回滾＝dnf remove firewalld。",
+  "risk": "A",
+  "risk_reason": "僅安裝套件，不啟動服務、不改變現有規則。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 firewalld 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "使用 nftables 或 iptables 的系統不得自動安裝 firewalld（避免與現有防火牆衝突），應判為不適用。"
+ },
+ {
+  "key": "firewalld_enabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0245",
+   "rhel9": "TWGCB-01-012-0243"
+  },
+  "category": "Firewalld 配置",
+  "title": "firewalld 服務",
+  "expected": "啟用",
+  "doc_method": "#systemctl --now enable firewalld",
+  "version_diff": "",
+  "type": "service_enabled",
+  "params": {
+   "unit": "firewalld.service",
+   "pkg": "firewalld"
+  },
+  "check": "systemctl is-enabled firewalld 為 enabled 且 firewall-cmd --state 為 running 即合格。",
+  "fix": "安全前置（防止切斷遠端連線）：以 sshd -T 取得所有 port 值（多值時全部；sshd -T 失敗則改用 ss -tlnp 找 sshd 監聽埠，兩者皆失敗則中止修復），並確認以下放行規則已存在且生效後才繼續：迴路介面 lo、已建立/相關連線（ct state established,related）、上述 sshd TCP 埠。流程：(1) 備份 /etc/firewalld/ 整個目錄與 firewalld、nftables、iptables、ip6tables 單元的 enabled/active/masked 狀態；(2) 服務未執行時先以 firewall-offline-cmd 修改永久設定：取得預設區域（firewall-offline-cmd --get-default-zone），若 sshd 埠為 22 確認區域含 ssh 服務（--add-service=ssh），否則 --add-port=<port>/tcp（每個埠）；firewalld 本身預設放行 lo 與 established/related，無需額外規則；(3) 以 ss -tlnp/-ulnp 列出其他對外監聽的埠並在報告中警示（不自動放行，以免擴大暴露）；(4) systemctl unmask firewalld（若被遮蔽）後 systemctl --now enable firewalld；(5) 立即以 firewall-cmd --list-all 驗證 ssh 埠已放行。回滾：systemctl --now disable firewalld（必要時 mask 回原狀），還原 /etc/firewalld/ 備份，恢復 nftables/iptables 原本狀態。",
+  "risk": "B",
+  "risk_reason": "啟用防火牆會阻擋未放行的連入連線，若未先放行 sshd 埠會中斷遠端管理。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 firewalld 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "firewalld 啟用後預設區域 public 僅放行 ssh、dhcpv6-client、cockpit；其他對外服務（如 httpd、資料庫）需管理者自行放行，報告中必須列出。若同時有 docker/podman/libvirt，firewalld 會建立對應區域，啟用順序可能影響容器網路。"
+ },
+ {
+  "key": "firewalld_iptables_masked",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0246",
+   "rhel9": "TWGCB-01-012-0244"
+  },
+  "category": "Firewalld 配置",
+  "title": "iptables 服務",
+  "expected": "停用",
+  "doc_method": "#systemctl --now mask iptables #systemctl --now mask ip6tables",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "units": [
+    "iptables.service",
+    "ip6tables.service"
+   ],
+   "state": "masked_or_absent"
+  },
+  "check": "iptables.service 與 ip6tables.service 皆為「未安裝（單元不存在）」或 systemctl is-enabled 為 masked，且皆非 active，即合格。",
+  "fix": "備份兩個單元的 enabled/active/masked 狀態與 /etc/sysconfig/iptables、ip6tables。若單元為 active：先 systemctl stop（其 ExecStop 會清空 iptables 規則），再 systemctl mask；若 firewalld 正在執行，之後執行 firewall-cmd --reload 重建規則。單元不存在時不需動作（不安裝 iptables-services）。回滾：systemctl unmask 並依原狀態 enable/start。",
+  "risk": "B",
+  "risk_reason": "停止正在執行的 iptables 服務會清空其規則，改變目前的封包過濾。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 firewalld 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "RHEL 8 iptables 指令實為 iptables-nft；iptables.service 來自 iptables-services 套件，RHEL 9 已不建議使用。"
+ },
+ {
+  "key": "firewalld_nftables_masked",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0247",
+   "rhel9": "TWGCB-01-012-0245"
+  },
+  "category": "Firewalld 配置",
+  "title": "nftables 服務",
+  "expected": "停用",
+  "doc_method": "#systemctl --now mask nftables",
+  "version_diff": "",
+  "type": "service_disabled",
+  "params": {
+   "units": [
+    "nftables.service"
+   ],
+   "mode": "mask"
+  },
+  "check": "systemctl is-enabled nftables 為 masked（或單元不存在）且非 active 即合格。",
+  "fix": "備份 nftables.service 狀態與 /etc/sysconfig/nftables.conf。注意 nftables.service 的 ExecStop 為 nft flush ruleset，會把 firewalld 的規則一併清掉：若 nftables.service 為 active，先 systemctl stop nftables，再 systemctl mask nftables，接著立即 firewall-cmd --reload 重建 firewalld 規則；若非 active，只執行 systemctl mask nftables（不要用 --now）。回滾：systemctl unmask nftables 並依原狀態 enable/start，再 firewall-cmd --reload。",
+  "risk": "B",
+  "risk_reason": "停止 nftables 服務會清空整個核心規則集，需立即重載 firewalld。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 firewalld 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "遮蔽的是 nftables.service（開機載入規則的服務），不是 nftables 套件；firewalld 在 RHEL 8/9 以 nftables 為後端，套件必須保留。"
+ },
+ {
+  "key": "firewalld_default_zone",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0248",
+   "rhel9": "TWGCB-01-012-0246"
+  },
+  "category": "Firewalld 配置",
+  "title": "firewalld 防火牆預設區域",
+  "expected": "須設定預設區域",
+  "doc_method": "#firewall-cmd --set-default-zone=(區域名稱)，例如 #firewall-cmd --set-default-zone=public",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "cmd": "firewall-cmd --get-default-zone",
+   "suggest": "public"
+  },
+  "check": "firewall-cmd --get-default-zone 有輸出且該區域存在於 firewall-cmd --get-zones，並且 /etc/firewalld/firewalld.conf 的 DefaultZone 有設定值，即合格。另以 firewall-cmd --get-active-zones 列出各介面所屬區域；預設區域為 trusted 時加註警告（等同全部放行）。firewalld 未執行時改用 firewall-offline-cmd。",
+  "fix": "只有在未設定或指向不存在區域時才修復：備份 /etc/firewalld/firewalld.conf，先確認 public 區域已放行 sshd 埠（同 firewalld_enabled 的前置檢查），再執行 firewall-cmd --set-default-zone=public（此指令同時寫入永久設定）。回滾：firewall-cmd --set-default-zone=<原區域> 或還原 firewalld.conf 後 firewall-cmd --reload。",
+  "risk": "B",
+  "risk_reason": "變更預設區域會改變未指定區域之介面的放行規則，可能影響連線。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 firewalld 且已安裝 firewalld 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "firewalld 安裝後預設即為 public，實務上幾乎都合格；GCB 未指定區域名稱，不可把既有的自訂預設區域強制改為 public。"
+ },
+ {
+  "key": "nftables_enabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0249",
+   "rhel9": "TWGCB-01-012-0247"
+  },
+  "category": "Nftables 配置",
+  "title": "nftables 服務",
+  "expected": "啟用",
+  "doc_method": "#systemctl --now enable nftables",
+  "version_diff": "",
+  "type": "service_enabled",
+  "params": {
+   "unit": "nftables.service",
+   "pkg": "nftables"
+  },
+  "check": "systemctl is-enabled nftables 為 enabled 且 is-active 為 active 即合格。",
+  "fix": "安全前置（防止切斷遠端連線）：以 sshd -T 取得所有 port 值（多值時全部；sshd -T 失敗則改用 ss -tlnp 找 sshd 監聽埠，兩者皆失敗則中止修復），並確認以下放行規則已存在且生效後才繼續：迴路介面 lo、已建立/相關連線（ct state established,related）、上述 sshd TCP 埠。在 nftables 模式下，啟用前先確認 /etc/sysconfig/nftables.conf 會載入的規則集含上述放行規則（若尚無規則集，先完成 nftables_table/base_chains/loopback 等項目）；以 nft -c -f /etc/sysconfig/nftables.conf 驗證後 systemctl --now enable nftables。備份：服務原狀態與 /etc/sysconfig/nftables.conf、/etc/nftables/；回滾：systemctl --now disable nftables（注意 stop 會 flush ruleset），還原設定檔。",
+  "risk": "B",
+  "risk_reason": "啟用服務會載入開機規則集並在停止時清空規則，直接影響網路連線。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 nftables 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "nftables 套件為 firewalld 的相依套件，一般已安裝；若未安裝，在 nftables 模式下可安裝（不與現有後端衝突）。"
+ },
+ {
+  "key": "nftables_firewalld_masked",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0250",
+   "rhel9": "TWGCB-01-012-0248"
+  },
+  "category": "Nftables 配置",
+  "title": "firewalld 服務",
+  "expected": "停用",
+  "doc_method": "#systemctl --now mask firewalld",
+  "version_diff": "",
+  "type": "service_disabled",
+  "params": {
+   "units": [
+    "firewalld.service"
+   ],
+   "mode": "mask"
+  },
+  "check": "systemctl is-enabled firewalld 為 masked（或未安裝）且非 active 即合格。",
+  "fix": "先確認 nftables 規則集已就緒並含 sshd 埠、lo、established 放行（同 nftables_enabled 前置）；備份 firewalld 狀態與 /etc/firewalld/；systemctl --now mask firewalld（停止時 firewalld 會移除自己的 table inet firewalld），接著 systemctl restart nftables 確保自訂規則集完整。回滾：systemctl unmask firewalld 並依原狀態 enable/start。",
+  "risk": "B",
+  "risk_reason": "停用 firewalld 會移除其所有規則，若 nftables 規則尚未就緒會造成防火牆空窗或規則錯亂。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 nftables 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "nftables_table",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0251",
+   "rhel9": "TWGCB-01-012-0249"
+  },
+  "category": "Nftables 配置",
+  "title": "在 nftables 中建立表",
+  "expected": "1 個以上",
+  "doc_method": "#nft create table inet (表名稱)，例如 #nft create table inet filter",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "cmd": "nft list tables",
+   "min_count": 1,
+   "suggest": "table inet filter"
+  },
+  "check": "兩處皆須合格：(1) 目前生效：nft list tables 至少 1 個表（排除 firewalld 建立的 inet firewalld 等非本基準管理的表亦可接受，但需至少 1 個）；(2) 開機後生效：/etc/sysconfig/nftables.conf 的有效 include 檔中至少定義 1 個 table。",
+  "fix": "nftables 規則由本工具管理的單一檔案 /etc/nftables/gcb-filter.nft（內容為 table inet filter 完整定義，開頭以「table inet filter {}」+「delete table inet filter」確保可重複載入）維護，修改後先 nft -c -f 驗證語法，再 nft -f 套用；若系統已有使用者自訂且非空的 nftables 設定（nftables.conf include 的檔案含規則），則不自動改寫，轉為人工處理。若沒有任何表，於 /etc/nftables/gcb-filter.nft 定義 table inet filter 並在 nftables.conf 加入 include（見 nftables_persist）。回滾：還原 nftables.conf 與刪除管理檔案後 nft delete table inet filter。",
+  "risk": "A",
+  "risk_reason": "建立空表不會影響封包流動。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 nftables 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "nftables_base_chains",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0252",
+   "rhel9": "TWGCB-01-012-0250"
+  },
+  "category": "Nftables 配置",
+  "title": "在 nftables 建立基本鏈",
+  "expected": "1 個以上",
+  "doc_method": "#nft create chain inet (表名稱) (鏈名稱) { type filter hook (input|forward|output) priority 0 \\; }，例如 #nft create chain inet filter input { type filter hook input priority 0 \\; }、#nft create chain inet filter forward { type filter hook forward priority 0 \\; }、#nft create chain inet filter output { type filter hook output priority 0 \\; }",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "hooks": [
+    "input",
+    "forward",
+    "output"
+   ],
+   "type": "filter"
+  },
+  "check": "解析 nft list ruleset（目前生效）與持久化設定檔（開機後生效），需存在 type filter 且 hook 分別為 input、forward、output 的基本鏈各至少 1 個（家族為 inet，或 ip 與 ip6 皆有）即合格。",
+  "fix": "nftables 規則由本工具管理的單一檔案 /etc/nftables/gcb-filter.nft（內容為 table inet filter 完整定義，開頭以「table inet filter {}」+「delete table inet filter」確保可重複載入）維護，修改後先 nft -c -f 驗證語法，再 nft -f 套用；若系統已有使用者自訂且非空的 nftables 設定（nftables.conf include 的檔案含規則），則不自動改寫，轉為人工處理。缺少的鏈以 policy accept 建立（policy drop 由 nftables_default_drop 處理），內容如 chain input { type filter hook input priority 0; policy accept; }。回滾：還原管理檔案後重新載入。",
+  "risk": "A",
+  "risk_reason": "以 accept 政策建立空鏈不會阻擋流量。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 nftables 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "GCB 設定值寫「1 個以上」，但說明要求建立輸入、轉發及輸出三個基本鏈，本規格以三個 hook 皆存在為合格。"
+ },
+ {
+  "key": "nftables_loopback",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0253",
+   "rhel9": "TWGCB-01-012-0251"
+  },
+  "category": "Nftables 配置",
+  "title": "在 nftables 設定回送流量規則",
+  "expected": "建立回送流量規則",
+  "doc_method": "#nft add rule inet filter input iif lo accept #nft add rule inet filter input ip saddr 127.0.0.0/8 counter drop #nft add rule inet filter input ip6 saddr ::1 counter drop",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "rules": [
+    "iif lo accept",
+    "ip saddr 127.0.0.0/8 counter drop",
+    "ip6 saddr ::1 counter drop"
+   ],
+   "chain": "inet filter input"
+  },
+  "check": "在 hook input 的基本鏈中（nft list ruleset 與持久化檔皆檢查）依序找到：iif \"lo\" accept、ip saddr 127.0.0.0/8 ... drop、ip6 saddr ::1 ... drop；且 iif lo accept 必須位於兩條 drop 之前。比對時忽略 counter 數值與引號差異。",
+  "fix": "nftables 規則由本工具管理的單一檔案 /etc/nftables/gcb-filter.nft（內容為 table inet filter 完整定義，開頭以「table inet filter {}」+「delete table inet filter」確保可重複載入）維護，修改後先 nft -c -f 驗證語法，再 nft -f 套用；若系統已有使用者自訂且非空的 nftables 設定（nftables.conf include 的檔案含規則），則不自動改寫，轉為人工處理。在 input 鏈開頭依序加入三條規則（若已有 ct state established,related accept 等規則則置於其後）。回滾：還原管理檔案後重新載入。",
+  "risk": "A",
+  "risk_reason": "只放行 lo 並丟棄偽造的回送位址封包，不影響正常流量。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 nftables 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "nftables_default_drop",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0254",
+   "rhel9": "TWGCB-01-012-0252"
+  },
+  "category": "Nftables 配置",
+  "title": "在 nftables 建立預設拒絕規則",
+  "expected": "Drop",
+  "doc_method": "#nft chain (位址族) (表名稱) (鏈名稱) { policy drop \\; }，例如 #nft chain inet filter input { policy drop \\; }、#nft chain inet filter forward { policy drop \\; }、#nft chain inet filter output { policy drop \\; }",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "chains": [
+    "input",
+    "forward",
+    "output"
+   ],
+   "policy": "drop",
+   "sub_risk": {
+    "input": "B",
+    "forward": "B",
+    "output": "C"
+   }
+  },
+  "check": "input、forward、output 三個 hook 的 filter 基本鏈 policy 皆為 drop（目前生效與持久化檔皆檢查）即合格；分別回報各鏈結果。",
+  "fix": "安全前置（防止切斷遠端連線）：以 sshd -T 取得所有 port 值（多值時全部；sshd -T 失敗則改用 ss -tlnp 找 sshd 監聽埠，兩者皆失敗則中止修復），並確認以下放行規則已存在且生效後才繼續：迴路介面 lo、已建立/相關連線（ct state established,related）、上述 sshd TCP 埠。nftables 規則由本工具管理的單一檔案 /etc/nftables/gcb-filter.nft（內容為 table inet filter 完整定義，開頭以「table inet filter {}」+「delete table inet filter」確保可重複載入）維護，修改後先 nft -c -f 驗證語法，再 nft -f 套用；若系統已有使用者自訂且非空的 nftables 設定（nftables.conf include 的檔案含規則），則不自動改寫，轉為人工處理。分段處理：(1) input：先在 input 鏈加入 ct state established,related accept、iif lo accept、tcp dport { <sshd 埠> } accept（並建議 ICMP/ICMPv6 必要類型與 IPv6 鄰居探索 accept，否則 IPv6 會失效），再將 policy 改為 drop；套用後確認 ssh 連線仍存在，必要時可用排程（例如 systemd-run --on-active=120 還原指令）作為自動回退保險，確認成功後取消；(2) forward：主機有 podman/docker/libvirt 或 net.ipv4.ip_forward=1 時改為人工處理，否則可設 drop；(3) output：一律不自動修改，只產生建議規則（lo、established,related、DNS、NTP、套件庫、日誌伺服器等）供管理者確認後自行套用。回滾：還原管理檔案並 nft -f 重新載入。",
+  "risk": "B",
+  "risk_reason": "（實作改為 B 類，原分析為 C 類，以程式為準）預設拒絕外出需逐一確認必要的對外連線，無法安全自動化；input/forward 部分可在前置放行後以 B 類流程處理。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 nftables 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "文件直接把三個鏈都設為 drop，未提及先放行 established 連線與 sshd 埠，照做會立即切斷遠端連線並阻擋 DNS/套件更新等外出連線。"
+ },
+ {
+  "key": "nftables_persist",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0255",
+   "rhel9": "TWGCB-01-012-0253"
+  },
+  "category": "Nftables 配置",
+  "title": "載入 nftables 規則",
+  "expected": "開機時自動載入 nftables 規則集",
+  "doc_method": "#vim /etc/sysconfig/nftables.conf，將包含 include 的行取消註解，例如 include \"/etc/nftables/main.nft\"",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "path": "/etc/sysconfig/nftables.conf",
+   "pattern": "^\\s*include\\s+\"[^\"]+\"",
+   "managed_include": "/etc/nftables/gcb-filter.nft"
+  },
+  "check": "/etc/sysconfig/nftables.conf 至少有 1 行未註解的 include，所指檔案存在且 nft -c -f /etc/sysconfig/nftables.conf 成功；並確認 nftables.service enabled（與 nftables_enabled 相同條件），才算開機會載入規則集。",
+  "fix": "備份 /etc/sysconfig/nftables.conf；加入 include \"/etc/nftables/gcb-filter.nft\"（不取消註解系統範例 main.nft，避免載入非預期規則）；nft -c -f 驗證通過才寫入。回滾：還原 nftables.conf。",
+  "risk": "B",
+  "risk_reason": "開機載入的規則集若缺少 sshd 放行會在重開機後失去遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "防火牆後端判定為 nftables 時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "RHEL 9 的 /etc/nftables/main.nft 範例會建立 table inet nftables_svc 並在 input 尾端 reject 未列於 services.nft 的連入（只放行 22 埠），照文件直接取消註解可能阻擋非預設 SSH 埠與其他服務；RHEL 8 各小版本隨附的範例檔不完全相同，應先檢查檔案存在與內容。"
+ },
+ {
+  "key": "iptables_enabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0256",
+   "rhel9": null
+  },
+  "category": "Iptables 配置",
+  "title": "iptables 服務",
+  "expected": "啟用",
+  "doc_method": "#systemctl --now enable iptables",
+  "version_diff": "",
+  "type": "service_enabled",
+  "params": {
+   "unit": "iptables.service",
+   "pkg": "iptables-services"
+  },
+  "check": "systemctl is-enabled iptables 為 enabled 且 is-active 為 active 即合格。",
+  "fix": "安全前置（防止切斷遠端連線）：以 sshd -T 取得所有 port 值（多值時全部；sshd -T 失敗則改用 ss -tlnp 找 sshd 監聽埠，兩者皆失敗則中止修復），並確認以下放行規則已存在且生效後才繼續：迴路介面 lo、已建立/相關連線（ct state established,related）、上述 sshd TCP 埠。確認 /etc/sysconfig/iptables 含 -A INPUT -i lo -j ACCEPT、-m state --state ESTABLISHED,RELATED -j ACCEPT（或 conntrack）、sshd 埠 ACCEPT（RHEL 預設檔已含 22 埠，若 sshd 使用其他埠需補上）後 systemctl --now enable iptables。不自動安裝 iptables-services。回滾：systemctl --now disable iptables（停止會清空規則），還原 /etc/sysconfig/iptables。",
+  "risk": "B",
+  "risk_reason": "啟用服務會載入保存的規則，若缺少 sshd 放行會中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "僅 RHEL 8，且防火牆後端判定為 iptables（已安裝 iptables-services 並使用 iptables.service）時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "iptables-services 在 RHEL 8 已不建議使用，工具不得為了符合此表格而安裝它（會與 firewalld 衝突）。"
+ },
+ {
+  "key": "iptables_firewalld_masked",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0257",
+   "rhel9": null
+  },
+  "category": "Iptables 配置",
+  "title": "firewalld 服務",
+  "expected": "停用",
+  "doc_method": "#systemctl --now mask firewalld",
+  "version_diff": "",
+  "type": "service_disabled",
+  "params": {
+   "units": [
+    "firewalld.service"
+   ],
+   "mode": "mask"
+  },
+  "check": "systemctl is-enabled firewalld 為 masked（或未安裝）且非 active 即合格。",
+  "fix": "先確認 iptables 規則已就緒並含 sshd 埠、lo、established 放行；備份 firewalld 狀態；systemctl --now mask firewalld，接著 systemctl restart iptables ip6tables 以確保規則完整。回滾：systemctl unmask firewalld 並依原狀態 enable/start。",
+  "risk": "B",
+  "risk_reason": "停用 firewalld 會移除其規則，若 iptables 規則未就緒會造成防火牆空窗。",
+  "needs_reboot": false,
+  "applies_when": "僅 RHEL 8，且防火牆後端判定為 iptables（已安裝 iptables-services 並使用 iptables.service）時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "iptables_default_drop",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0258",
+   "rhel9": null
+  },
+  "category": "Iptables 配置",
+  "title": "在 iptables 建立預設拒絕規則",
+  "expected": "Drop",
+  "doc_method": "#iptables -P INPUT DROP #iptables -P OUTPUT DROP #iptables -P FORWARD DROP",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "family": "ipv4",
+   "chains": [
+    "INPUT",
+    "FORWARD",
+    "OUTPUT"
+   ],
+   "policy": "DROP",
+   "sub_risk": {
+    "INPUT": "B",
+    "FORWARD": "B",
+    "OUTPUT": "C"
+   }
+  },
+  "check": "iptables -S（或 iptables -L -n）中 -P INPUT DROP、-P FORWARD DROP、-P OUTPUT DROP 三者皆成立，且 /etc/sysconfig/iptables 中對應的 :INPUT DROP、:FORWARD DROP、:OUTPUT DROP 也成立，即合格；分別回報各鏈。",
+  "fix": "安全前置（防止切斷遠端連線）：以 sshd -T 取得所有 port 值（多值時全部；sshd -T 失敗則改用 ss -tlnp 找 sshd 監聽埠，兩者皆失敗則中止修復），並確認以下放行規則已存在且生效後才繼續：迴路介面 lo、已建立/相關連線（ct state established,related）、上述 sshd TCP 埠。INPUT：先 iptables -I INPUT 加入 -i lo -j ACCEPT、-m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT、-p tcp --dport <sshd 埠> -j ACCEPT，再 iptables -P INPUT DROP；FORWARD：主機有容器/虛擬化或開啟轉發時改人工，否則 -P FORWARD DROP；OUTPUT：一律不自動修改，只產生建議規則（-o lo、ESTABLISHED,RELATED、DNS、NTP、套件庫等）。規則持久化：修改後以 iptables-save > /etc/sysconfig/iptables（IPv6 為 ip6tables-save > /etc/sysconfig/ip6tables）或 service iptables save 保存；修改前備份這兩個檔案與 iptables-save 輸出。回滾：iptables-restore < 備份檔，還原 /etc/sysconfig/iptables。",
+  "risk": "B",
+  "risk_reason": "（實作改為 B 類，原分析為 C 類，以程式為準）預設拒絕外出無法安全自動化；INPUT/FORWARD 部分可在前置放行後以 B 類流程處理。",
+  "needs_reboot": false,
+  "applies_when": "僅 RHEL 8，且防火牆後端判定為 iptables（已安裝 iptables-services 並使用 iptables.service）時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": "文件把預設拒絕（項次 3）排在回送規則（項次 4）之前且未放行 established 與 sshd，照順序執行會立即中斷遠端連線。"
+ },
+ {
+  "key": "iptables_loopback",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0259",
+   "rhel9": null
+  },
+  "category": "Iptables 配置",
+  "title": "在 iptables 設定回送流量規則",
+  "expected": "建立回送流量規則",
+  "doc_method": "#iptables -A INPUT -i lo -j ACCEPT #iptables -A OUTPUT -o lo -j ACCEPT #iptables -A INPUT -s 127.0.0.0/8 -j DROP",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "family": "ipv4",
+   "rules": [
+    "-A INPUT -i lo -j ACCEPT",
+    "-A OUTPUT -o lo -j ACCEPT",
+    "-A INPUT -s 127.0.0.0/8 -j DROP"
+   ]
+  },
+  "check": "iptables -S 輸出中三條規則皆存在，且 -A INPUT -i lo -j ACCEPT 位於 -A INPUT -s 127.0.0.0/8 -j DROP 之前；/etc/sysconfig/iptables 亦需含相同規則。",
+  "fix": "缺少的規則以 iptables -I INPUT 1 / iptables -I OUTPUT 1 插入到鏈開頭（避免排在既有 DROP/REJECT 之後而無效），127.0.0.0/8 DROP 置於 lo ACCEPT 之後。規則持久化：修改後以 iptables-save > /etc/sysconfig/iptables（IPv6 為 ip6tables-save > /etc/sysconfig/ip6tables）或 service iptables save 保存；修改前備份這兩個檔案與 iptables-save 輸出。回滾：iptables-restore < 備份。",
+  "risk": "A",
+  "risk_reason": "只放行 lo 並丟棄偽造回送位址封包，不影響正常流量。",
+  "needs_reboot": false,
+  "applies_when": "僅 RHEL 8，且防火牆後端判定為 iptables（已安裝 iptables-services 並使用 iptables.service）時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "ip6tables_default_drop",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0260",
+   "rhel9": null
+  },
+  "category": "Iptables 配置",
+  "title": "在 ip6tables 建立預設拒絕規則",
+  "expected": "Drop",
+  "doc_method": "# ip6tables -P INPUT DROP # ip6tables -P OUTPUT DROP # ip6tables -P FORWARD DROP",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "family": "ipv6",
+   "chains": [
+    "INPUT",
+    "FORWARD",
+    "OUTPUT"
+   ],
+   "policy": "DROP",
+   "sub_risk": {
+    "INPUT": "B",
+    "FORWARD": "B",
+    "OUTPUT": "C"
+   }
+  },
+  "check": "ip6tables -S 中 -P INPUT DROP、-P FORWARD DROP、-P OUTPUT DROP 皆成立，且 /etc/sysconfig/ip6tables 對應設定相同，即合格。核心停用 IPv6（ipv6.disable=1）時 ip6tables 無法運作，判為不適用。",
+  "fix": "安全前置（防止切斷遠端連線）：以 sshd -T 取得所有 port 值（多值時全部；sshd -T 失敗則改用 ss -tlnp 找 sshd 監聽埠，兩者皆失敗則中止修復），並確認以下放行規則已存在且生效後才繼續：迴路介面 lo、已建立/相關連線（ct state established,related）、上述 sshd TCP 埠。INPUT：先 ip6tables -I INPUT 加入 -i lo -j ACCEPT、-m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT、-p tcp --dport <sshd 埠> -j ACCEPT 以及 ICMPv6 鄰居探索/路由器通告（type 133-136）ACCEPT，再設 DROP；FORWARD 同 IPv4 處理；OUTPUT 一律不自動修改，只產生建議規則。持久化 ip6tables-save > /etc/sysconfig/ip6tables。回滾：ip6tables-restore < 備份。",
+  "risk": "B",
+  "risk_reason": "（實作改為 B 類，原分析為 C 類，以程式為準）預設拒絕外出無法安全自動化，IPv6 未放行 ICMPv6 會使網路失效。",
+  "needs_reboot": false,
+  "applies_when": "僅 RHEL 8，且防火牆後端判定為 iptables（已安裝 iptables-services 並使用 iptables.service）時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。（ip6tables.service 同屬 iptables-services）",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "ip6tables_loopback",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0261",
+   "rhel9": null
+  },
+  "category": "Iptables 配置",
+  "title": "在 ip6tables 設定回送流量規則",
+  "expected": "建立回送流量規則",
+  "doc_method": "# ip6tables -A INPUT -i lo -j ACCEPT # ip6tables -A OUTPUT -o lo -j ACCEPT # ip6tables -A INPUT -s ::1 -j DROP",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "family": "ipv6",
+   "rules": [
+    "-A INPUT -i lo -j ACCEPT",
+    "-A OUTPUT -o lo -j ACCEPT",
+    "-A INPUT -s ::1/128 -j DROP"
+   ]
+  },
+  "check": "ip6tables -S 輸出中三條規則皆存在（-s ::1 會顯示為 ::1/128），且 lo ACCEPT 位於 ::1 DROP 之前；/etc/sysconfig/ip6tables 亦需含相同規則。IPv6 停用時不適用。",
+  "fix": "缺少的規則以 ip6tables -I 插入鏈開頭，::1 DROP 置於 lo ACCEPT 之後；ip6tables-save > /etc/sysconfig/ip6tables 持久化。回滾：ip6tables-restore < 備份。",
+  "risk": "A",
+  "risk_reason": "只放行 lo 並丟棄偽造回送位址封包，不影響正常流量。",
+  "needs_reboot": false,
+  "applies_when": "僅 RHEL 8，且防火牆後端判定為 iptables（已安裝 iptables-services 並使用 iptables.service）時。防火牆後端多選一（firewalld / nftables / iptables，RHEL 9 無 iptables 選項）。判定順序：(1) config.ini 若指定 firewall_backend 則以其為準；(2) firewalld.service 為 active 或 enabled → firewalld；(3) 否則 nftables.service 為 enabled/active 且 /etc/sysconfig/nftables.conf 有有效 include → nftables；(4) 否則（僅 RHEL 8）已安裝 iptables-services 且 iptables.service enabled/active → iptables；(5) 都沒有 → 預設 firewalld（RHEL 預設）。其他兩套表格的規則一律判為「不適用」，不檢測也不修復。",
+  "existing": false,
+  "notes": ""
+ }
+]

@@ -1,0 +1,527 @@
+[
+  {
+    "id": "TWGCB-01-014-0001",
+    "category": "磁碟與檔案系統",
+    "title": "cramfs 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增或編輯 /etc/modprobe.d/cramfs.conf，加入「install cramfs /bin/false」與「blacklist cramfs」兩行；執行 modprobe -r cramfs 移除已載入模組",
+    "type": "module_disabled",
+    "params": {
+      "module": "cramfs"
+    },
+    "check": "(1) 執行 `modprobe -n -v cramfs`，輸出須為「install /bin/false」或「install /bin/true」（或模組不存在）；(2) `modprobe --showconfig` 中須有「blacklist cramfs」；(3) /proc/modules（lsmod）中不得出現 cramfs。若 cramfs 列於 /lib/modules/$(uname -r)/modules.builtin（編入核心），modprobe.d 設定無效，應回報「無法以模組方式停用」而非單純不合格。三項皆符合才合格",
+    "fix": "備份既有 /etc/modprobe.d/cramfs.conf（若存在）；寫入獨立檔 /etc/modprobe.d/cramfs.conf，內容為「install cramfs /bin/false」與「blacklist cramfs」；若模組已載入，執行 `modprobe -r cramfs`（失敗代表使用中，記錄需重開機後生效）。回滾：還原或刪除該 conf 檔",
+    "risk": "A",
+    "risk_reason": "伺服器幾乎不會使用 cramfs，停用只是寫入 modprobe 設定檔。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0002",
+    "category": "磁碟與檔案系統",
+    "title": "squashfs 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增或編輯 /etc/modprobe.d/squashfs.conf，加入「install squashfs /bin/false」與「blacklist squashfs」兩行；執行 modprobe -r squashfs 移除已載入模組",
+    "type": "module_disabled",
+    "params": {
+      "module": "squashfs"
+    },
+    "check": "(1) 執行 `modprobe -n -v squashfs`，輸出須為「install /bin/false」或「install /bin/true」（或模組不存在）；(2) `modprobe --showconfig` 中須有「blacklist squashfs」；(3) /proc/modules（lsmod）中不得出現 squashfs。若 squashfs 列於 /lib/modules/$(uname -r)/modules.builtin（編入核心），modprobe.d 設定無效，應回報「無法以模組方式停用」而非單純不合格。三項皆符合才合格",
+    "fix": "備份既有 /etc/modprobe.d/squashfs.conf（若存在）；寫入獨立檔 /etc/modprobe.d/squashfs.conf，內容為「install squashfs /bin/false」與「blacklist squashfs」；若模組已載入，執行 `modprobe -r squashfs`（失敗代表使用中，記錄需重開機後生效）。回滾：還原或刪除該 conf 檔",
+    "risk": "B",
+    "risk_reason": "Ubuntu 22.04 伺服器預設以 snap 安裝 lxd 等套件，snap 依賴 squashfs 掛載，停用會使 snap 套件無法運作。",
+    "needs_reboot": false,
+    "applies_when": "一律（若系統有使用 snap 應先人工確認）",
+    "notes": "文件本身也註明停用 squashfs 可能導致 Snap 套件無法正常運作。Ubuntu 22.04 預設安裝 snapd 且通常已有 /snap/* squashfs 掛載，模組使用中時 modprobe -r 會失敗；另部分 Ubuntu 核心將 squashfs 編入核心（modules.builtin），此時無法以 modprobe.d 停用，檢測需區分。建議修復前檢查 `findmnt -t squashfs` 與 `snap list`，有使用者降為人工處理"
+  },
+  {
+    "id": "TWGCB-01-014-0003",
+    "category": "磁碟與檔案系統",
+    "title": "udf 檔案系統",
+    "expected": "停用",
+    "doc_method": "新增或編輯 /etc/modprobe.d/udf.conf，加入「install udf /bin/false」與「blacklist udf」兩行；執行 modprobe -r udf 移除已載入模組",
+    "type": "module_disabled",
+    "params": {
+      "module": "udf"
+    },
+    "check": "(1) 執行 `modprobe -n -v udf`，輸出須為「install /bin/false」或「install /bin/true」（或模組不存在）；(2) `modprobe --showconfig` 中須有「blacklist udf」；(3) /proc/modules（lsmod）中不得出現 udf。若 udf 列於 /lib/modules/$(uname -r)/modules.builtin（編入核心），modprobe.d 設定無效，應回報「無法以模組方式停用」而非單純不合格。三項皆符合才合格",
+    "fix": "備份既有 /etc/modprobe.d/udf.conf（若存在）；寫入獨立檔 /etc/modprobe.d/udf.conf，內容為「install udf /bin/false」與「blacklist udf」；若模組已載入，執行 `modprobe -r udf`（失敗代表使用中，記錄需重開機後生效）。回滾：還原或刪除該 conf 檔",
+    "risk": "A",
+    "risk_reason": "伺服器通常不讀取光碟媒體，停用只是寫入 modprobe 設定檔。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "文件註明 udf 若運行在 Microsoft Azure 上停用可能影響系統運作（Azure 以 UDF 格式光碟提供佈建資料），工具可偵測 /sys/class/dmi/id/sys_vendor 為 Microsoft Corporation 時改為人工確認"
+  },
+  {
+    "id": "TWGCB-01-014-0004",
+    "category": "磁碟與檔案系統",
+    "title": "設定/tmp 目錄之檔案系統",
+    "expected": "tmpfs",
+    "doc_method": "任一方式：(1) 編輯 /etc/fstab，加入「tmpfs /tmp tmpfs defaults,rw,nosuid,nodev,noexec,relatime 0 0」；(2) 執行 `systemctl unmask tmp.mount`、`systemctl enable tmp.mount`，並編輯 /etc/systemd/system/local-fs.target.wants/tmp.mount，[Mount] 區段：What=tmpfs、Where=/tmp、Type=tmpfs、Options=mode=1777,strictatime,noexec,nodev,nosuid",
+    "type": "custom",
+    "params": {
+      "description": "檢查 /tmp 是否為 tmpfs 掛載",
+      "mount": "/tmp",
+      "fstype": "tmpfs"
+    },
+    "check": "執行 `findmnt -kn -o FSTYPE /tmp`，輸出為 tmpfs 才合格；另確認持久化來源存在：/etc/fstab 有掛載點 /tmp、類型 tmpfs 的有效列，或 `systemctl is-enabled tmp.mount` 為 enabled（且未 masked）。僅執行中掛載而無持久設定時回報不合格（重開機後失效）",
+    "fix": "備份 /etc/fstab；若 fstab 已有 /tmp 列（非 tmpfs，例如獨立磁區）則不自動修改、轉人工；否則在 /etc/fstab 新增「tmpfs /tmp tmpfs defaults,rw,nosuid,nodev,noexec,relatime,mode=1777 0 0」並執行 `systemctl daemon-reload`。不立即掛載（避免覆蓋 /tmp 中執行中程式的檔案），標記需重開機。回滾：還原 /etc/fstab 並 daemon-reload。替代方案：以 /usr/share/systemd/tmp.mount 複製為 /etc/systemd/system/tmp.mount 後 enable",
+    "risk": "B",
+    "risk_reason": "改變 /tmp 掛載方式需重開機，且 noexec 與記憶體容量限制可能影響安裝程式或大量暫存檔的服務。",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "notes": "文件 fstab 範例「noexec, relatime」中的空白為 PDF 斷行所致，實際不可有空白；兩種方法選項不一致（relatime 與 strictatime）。文件要求編輯 /etc/systemd/system/local-fs.target.wants/tmp.mount 不正確：該路徑是 enable 後產生的符號連結，Ubuntu 22.04 的 tmp.mount 範本位於 /usr/share/systemd/tmp.mount 且預設未安裝到 unit 路徑，`systemctl enable tmp.mount` 可能找不到 unit；正確作法是 fstab 或放置 /etc/systemd/system/tmp.mount（或 drop-in）。Ubuntu 22.04 預設 /tmp 位於根檔案系統，不是 tmpfs。tmpfs 預設大小為 RAM 的 50%"
+  },
+  {
+    "id": "TWGCB-01-014-0005",
+    "category": "磁碟與檔案系統",
+    "title": "設定/tmp 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /tmp 列的第 4 欄加入「,nodev」，再執行 `mount -o remount,nodev /tmp`；或編輯 /etc/systemd/system/local-fs.target.wants/tmp.mount，[Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid，再執行 `mount -o remount,nodev /tmp`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/tmp",
+      "option": "nodev"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /tmp`（或解析 /proc/self/mounts 中掛載點恰為 /tmp 的列）的選項清單須包含 nodev；(2) 持久設定也須包含 nodev：/etc/fstab 中掛載點為 /tmp 的有效列第 4 欄，或 tmp.mount（含 drop-in）的 Options=。兩者皆符合才合格；若 /tmp 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /tmp 的列第 4 欄附加「,nodev」（已存在則跳過，保留其他選項與註解）；若 /tmp 由 tmp.mount unit 掛載（fstab 無 /tmp 列），改建立 drop-in /etc/systemd/system/tmp.mount.d/gcb-tmp-options.conf，內容 [Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid，再 daemon-reload；回滾刪除 drop-in。以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nodev /tmp` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /tmp`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/tmp 為獨立掛載點",
+    "notes": "Ubuntu 22.04 預設 /tmp 不是獨立掛載點，需先完成 TWGCB-01-014-0004。文件 tmp.mount 路徑問題同 0004"
+  },
+  {
+    "id": "TWGCB-01-014-0006",
+    "category": "磁碟與檔案系統",
+    "title": "設定/tmp 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /tmp 列的第 4 欄加入「,nosuid」，再執行 `mount -o remount,nosuid /tmp`；或編輯 /etc/systemd/system/local-fs.target.wants/tmp.mount，[Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid，再執行 `mount -o remount,nosuid /tmp`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/tmp",
+      "option": "nosuid"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /tmp`（或解析 /proc/self/mounts 中掛載點恰為 /tmp 的列）的選項清單須包含 nosuid；(2) 持久設定也須包含 nosuid：/etc/fstab 中掛載點為 /tmp 的有效列第 4 欄，或 tmp.mount（含 drop-in）的 Options=。兩者皆符合才合格；若 /tmp 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /tmp 的列第 4 欄附加「,nosuid」（已存在則跳過，保留其他選項與註解）；若 /tmp 由 tmp.mount unit 掛載（fstab 無 /tmp 列），改建立 drop-in /etc/systemd/system/tmp.mount.d/gcb-tmp-options.conf，內容 [Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid，再 daemon-reload；回滾刪除 drop-in。以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nosuid /tmp` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /tmp`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/tmp 為獨立掛載點",
+    "notes": "Ubuntu 22.04 預設 /tmp 不是獨立掛載點，需先完成 TWGCB-01-014-0004。文件 tmp.mount 路徑問題同 0004"
+  },
+  {
+    "id": "TWGCB-01-014-0007",
+    "category": "磁碟與檔案系統",
+    "title": "設定/tmp 目錄之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /tmp 列的第 4 欄加入「,noexec」，再執行 `mount -o remount,noexec /tmp`；或編輯 /etc/systemd/system/local-fs.target.wants/tmp.mount，[Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid，再執行 `mount -o remount,noexec /tmp`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/tmp",
+      "option": "noexec"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /tmp`（或解析 /proc/self/mounts 中掛載點恰為 /tmp 的列）的選項清單須包含 noexec；(2) 持久設定也須包含 noexec：/etc/fstab 中掛載點為 /tmp 的有效列第 4 欄，或 tmp.mount（含 drop-in）的 Options=。兩者皆符合才合格；若 /tmp 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /tmp 的列第 4 欄附加「,noexec」（已存在則跳過，保留其他選項與註解）；若 /tmp 由 tmp.mount unit 掛載（fstab 無 /tmp 列），改建立 drop-in /etc/systemd/system/tmp.mount.d/gcb-tmp-options.conf，內容 [Mount] Options=mode=1777,strictatime,noexec,nodev,nosuid，再 daemon-reload；回滾刪除 drop-in。以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,noexec /tmp` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /tmp`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "noexec 可能使在 /tmp 執行腳本的安裝程式或服務失敗，且需修改 fstab。",
+    "needs_reboot": false,
+    "applies_when": "/tmp 為獨立掛載點",
+    "notes": "Ubuntu 22.04 預設 /tmp 不是獨立掛載點，需先完成 TWGCB-01-014-0004。文件 tmp.mount 路徑問題同 0004。/tmp noexec 可能使部分安裝程式、編譯工具或在 /tmp 執行腳本的軟體失敗"
+  },
+  {
+    "id": "TWGCB-01-014-0008",
+    "category": "磁碟與檔案系統",
+    "title": "設定/dev/shm 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /dev/shm 列的第 4 欄加入「,nodev」，再執行 `mount -o remount,nodev /dev/shm`；若掛載點不存在，於 /etc/fstab 新增列，範例：tmpfs /dev/shm tmpfs rw,nosuid,nodev,inode64 0 0",
+    "type": "mount_option",
+    "params": {
+      "mount": "/dev/shm",
+      "option": "nodev"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /dev/shm`（或解析 /proc/self/mounts 中掛載點恰為 /dev/shm 的列）的選項清單須包含 nodev；(2) 持久設定也須包含 nodev：/etc/fstab 中掛載點為 /dev/shm 的有效列第 4 欄。兩者皆符合才合格；/dev/shm 於 Ubuntu 22.04 一律存在",
+    "fix": "備份 /etc/fstab；在掛載點為 /dev/shm 的列第 4 欄附加「,nodev」（已存在則跳過，保留其他選項與註解）；若 fstab 無 /dev/shm 列（Ubuntu 22.04 預設即無），新增「tmpfs /dev/shm tmpfs rw,nosuid,nodev,noexec,inode64 0 0」（三條 /dev/shm 規則共用同一列，各自補上缺少的選項）。以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nodev /dev/shm` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /dev/shm`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 的 /dev/shm 由 systemd 自動掛載，預設選項為 rw,nosuid,nodev,inode64，/etc/fstab 預設無此列；執行中狀態已含 nodev、nosuid，但仍需新增 fstab 列以達持久設定"
+  },
+  {
+    "id": "TWGCB-01-014-0009",
+    "category": "磁碟與檔案系統",
+    "title": "設定/dev/shm 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /dev/shm 列的第 4 欄加入「,nosuid」，再執行 `mount -o remount,nosuid /dev/shm`；若掛載點不存在，於 /etc/fstab 新增列，範例：tmpfs /dev/shm tmpfs rw,nosuid,nodev,inode64 0 0",
+    "type": "mount_option",
+    "params": {
+      "mount": "/dev/shm",
+      "option": "nosuid"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /dev/shm`（或解析 /proc/self/mounts 中掛載點恰為 /dev/shm 的列）的選項清單須包含 nosuid；(2) 持久設定也須包含 nosuid：/etc/fstab 中掛載點為 /dev/shm 的有效列第 4 欄。兩者皆符合才合格；/dev/shm 於 Ubuntu 22.04 一律存在",
+    "fix": "備份 /etc/fstab；在掛載點為 /dev/shm 的列第 4 欄附加「,nosuid」（已存在則跳過，保留其他選項與註解）；若 fstab 無 /dev/shm 列（Ubuntu 22.04 預設即無），新增「tmpfs /dev/shm tmpfs rw,nosuid,nodev,noexec,inode64 0 0」（三條 /dev/shm 規則共用同一列，各自補上缺少的選項）。以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nosuid /dev/shm` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /dev/shm`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 的 /dev/shm 由 systemd 自動掛載，預設選項為 rw,nosuid,nodev,inode64，/etc/fstab 預設無此列；執行中狀態已含 nodev、nosuid，但仍需新增 fstab 列以達持久設定。文件範例「rw, nosuid」中的空白為 PDF 斷行所致"
+  },
+  {
+    "id": "TWGCB-01-014-0010",
+    "category": "磁碟與檔案系統",
+    "title": "設定/dev/shm 目錄之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /dev/shm 列的第 4 欄加入「,noexec」，再執行 `mount -o remount,noexec /dev/shm`；若掛載點不存在，於 /etc/fstab 新增列，範例：tmpfs /dev/shm tmpfs rw,nosuid,nodev,noexec,inode64 0 0",
+    "type": "mount_option",
+    "params": {
+      "mount": "/dev/shm",
+      "option": "noexec"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /dev/shm`（或解析 /proc/self/mounts 中掛載點恰為 /dev/shm 的列）的選項清單須包含 noexec；(2) 持久設定也須包含 noexec：/etc/fstab 中掛載點為 /dev/shm 的有效列第 4 欄。兩者皆符合才合格；/dev/shm 於 Ubuntu 22.04 一律存在",
+    "fix": "備份 /etc/fstab；在掛載點為 /dev/shm 的列第 4 欄附加「,noexec」（已存在則跳過，保留其他選項與註解）；若 fstab 無 /dev/shm 列（Ubuntu 22.04 預設即無），新增「tmpfs /dev/shm tmpfs rw,nosuid,nodev,noexec,inode64 0 0」（三條 /dev/shm 規則共用同一列，各自補上缺少的選項）。以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,noexec /dev/shm` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /dev/shm`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "noexec 可能影響使用共享記憶體執行程式碼的應用，且需修改 fstab。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 /dev/shm 未啟用 noexec。文件範例「rw, nosuid」中的空白為 PDF 斷行所致。少數應用（如部分資料庫、JIT 或使用 shm 執行碼的程式）可能受影響"
+  },
+  {
+    "id": "TWGCB-01-014-0011",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新安裝系統於安裝時為 /var 建立獨立磁區；已安裝系統先全系統備份，再以 LVM 建立，範例：gdisk /dev/sda（n、3、First sector 按 enter、Last sector +256M、Hex code 8e00、w）→ partprobe → pvcreate /dev/sda3 → vgcreate -s 16M varvg /dev/sda3 → vgdisplay（Total PE 15）→ lvcreate -l 15 -n varlv varvg → mkfs.xfs /dev/varvg/varlv；於 /etc/fstab 新增「/dev/varvg/varlv /var xfs defaults 0 0」",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/var"
+    },
+    "check": "執行 `findmnt -kn /var`（或解析 /proc/self/mounts），須有掛載點恰為 /var 的掛載，且不是 bind mount（SOURCE 不含 [子路徑]）；同時 /etc/fstab 須有掛載點為 /var 的有效列。皆符合才合格",
+    "fix": "不自動修復；輸出文件中的 LVM 步驟與建議，由管理員於維護時段備份後人工重新規劃磁區、搬移資料",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移既有資料，無法安全自動化。",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設安裝只建立單一根磁區（LVM 時為 ubuntu-vg/ubuntu-lv），此項預設不合格。文件範例 256MB 僅為示意，實務容量遠不足；Ubuntu 預設檔案系統為 ext4，不必使用 xfs。文件 /etc/fstab 範例中「0  0」多一個空白不影響"
+  },
+  {
+    "id": "TWGCB-01-014-0012",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var 列的第 4 欄加入「,nodev」，再執行 `mount -o remount,nodev /var`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var",
+      "option": "nodev"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var`（或解析 /proc/self/mounts 中掛載點恰為 /var 的列）的選項清單須包含 nodev；(2) 持久設定也須包含 nodev：/etc/fstab 中掛載點為 /var 的有效列第 4 欄。兩者皆符合才合格；若 /var 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var 的列第 4 欄附加「,nodev」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nodev /var` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var 為獨立掛載點",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0013",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var 列的第 4 欄加入「,nosuid」，再執行 `mount -o remount,nosuid /var`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var",
+      "option": "nosuid"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var`（或解析 /proc/self/mounts 中掛載點恰為 /var 的列）的選項清單須包含 nosuid；(2) 持久設定也須包含 nosuid：/etc/fstab 中掛載點為 /var 的有效列第 4 欄。兩者皆符合才合格；若 /var 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var 的列第 4 欄附加「,nosuid」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nosuid /var` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var 為獨立掛載點",
+    "notes": "/var 下可能有 snap（/var/lib/snapd）、容器（/var/lib/docker）等需執行或 setuid 的內容，nosuid 可能影響 snap 或容器運作，修復前宜確認"
+  },
+  {
+    "id": "TWGCB-01-014-0014",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/tmp 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新安裝系統於安裝時為 /var/tmp 建立獨立磁區；已安裝系統先全系統備份，再以 LVM 建立，範例：gdisk /dev/sda（n、3、First sector 按 enter、Last sector +256M、Hex code 8e00、w）→ partprobe → pvcreate /dev/sda3 → vgcreate -s 16M vartmpvg /dev/sda3 → vgdisplay（Total PE 15）→ lvcreate -l 15 -n vartmplv vartmpvg → mkfs.xfs /dev/vartmpvg/vartmplv；於 /etc/fstab 新增「/dev/vartmpvg/vartmplv /var/tmp xfs defaults 0 0」",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/var/tmp"
+    },
+    "check": "執行 `findmnt -kn /var/tmp`（或解析 /proc/self/mounts），須有掛載點恰為 /var/tmp 的掛載，且不是 bind mount（SOURCE 不含 [子路徑]）；同時 /etc/fstab 須有掛載點為 /var/tmp 的有效列。皆符合才合格",
+    "fix": "不自動修復；輸出文件中的 LVM 步驟與建議，由管理員於維護時段備份後人工重新規劃磁區、搬移資料",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移既有資料，無法安全自動化。",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設安裝只建立單一根磁區（LVM 時為 ubuntu-vg/ubuntu-lv），此項預設不合格。文件範例 256MB 僅為示意，實務容量遠不足；Ubuntu 預設檔案系統為 ext4，不必使用 xfs"
+  },
+  {
+    "id": "TWGCB-01-014-0015",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/tmp 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var/tmp 列的第 4 欄加入「,nodev」，再執行 `mount -o remount,nodev /var/tmp`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/tmp",
+      "option": "nodev"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var/tmp`（或解析 /proc/self/mounts 中掛載點恰為 /var/tmp 的列）的選項清單須包含 nodev；(2) 持久設定也須包含 nodev：/etc/fstab 中掛載點為 /var/tmp 的有效列第 4 欄。兩者皆符合才合格；若 /var/tmp 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var/tmp 的列第 4 欄附加「,nodev」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nodev /var/tmp` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var/tmp`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var/tmp 為獨立掛載點",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0016",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/tmp 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var/tmp 列的第 4 欄加入「,nosuid」，再執行 `mount -o remount,nosuid /var/tmp`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/tmp",
+      "option": "nosuid"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var/tmp`（或解析 /proc/self/mounts 中掛載點恰為 /var/tmp 的列）的選項清單須包含 nosuid；(2) 持久設定也須包含 nosuid：/etc/fstab 中掛載點為 /var/tmp 的有效列第 4 欄。兩者皆符合才合格；若 /var/tmp 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var/tmp 的列第 4 欄附加「,nosuid」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nosuid /var/tmp` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var/tmp`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var/tmp 為獨立掛載點",
+    "notes": "文件「, nosuid」中的空白為 PDF 斷行所致"
+  },
+  {
+    "id": "TWGCB-01-014-0017",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/tmp 目錄之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var/tmp 列的第 4 欄加入「,noexec」，再執行 `mount -o remount,noexec /var/tmp`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/tmp",
+      "option": "noexec"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var/tmp`（或解析 /proc/self/mounts 中掛載點恰為 /var/tmp 的列）的選項清單須包含 noexec；(2) 持久設定也須包含 noexec：/etc/fstab 中掛載點為 /var/tmp 的有效列第 4 欄。兩者皆符合才合格；若 /var/tmp 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var/tmp 的列第 4 欄附加「,noexec」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,noexec /var/tmp` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var/tmp`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "noexec 可能使在 /var/tmp 執行程式的安裝程式失敗，且需修改 fstab。",
+    "needs_reboot": false,
+    "applies_when": "/var/tmp 為獨立掛載點",
+    "notes": "此規則開頭文字在抽取檔中混入 0016 區塊，已重組。noexec 可能影響在 /var/tmp 執行程式的安裝程式"
+  },
+  {
+    "id": "TWGCB-01-014-0018",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新安裝系統於安裝時為 /var/log 建立獨立磁區；已安裝系統先全系統備份，再以 LVM 建立，範例：gdisk /dev/sda（n、3、First sector 按 enter、Last sector +256M、Hex code 8e00、w）→ partprobe → pvcreate /dev/sda3 → vgcreate -s 16M varlogvg /dev/sda3 → vgdisplay（Total PE 15）→ lvcreate -l 15 -n varloglv varlogvg → mkfs.xfs /dev/varlogvg/varloglv；於 /etc/fstab 新增「/dev/varlogvg/varloglv /var/log xfs defaults 0 0」",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/var/log"
+    },
+    "check": "執行 `findmnt -kn /var/log`（或解析 /proc/self/mounts），須有掛載點恰為 /var/log 的掛載，且不是 bind mount（SOURCE 不含 [子路徑]）；同時 /etc/fstab 須有掛載點為 /var/log 的有效列。皆符合才合格",
+    "fix": "不自動修復；輸出文件中的 LVM 步驟與建議，由管理員於維護時段備份後人工重新規劃磁區、搬移資料",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移既有資料，無法安全自動化。",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設安裝只建立單一根磁區（LVM 時為 ubuntu-vg/ubuntu-lv），此項預設不合格。文件範例 256MB 僅為示意，實務容量遠不足；Ubuntu 預設檔案系統為 ext4，不必使用 xfs"
+  },
+  {
+    "id": "TWGCB-01-014-0019",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var/log 列的第 4 欄加入「,nodev」，再執行 `mount -o remount,nodev /var/log`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/log",
+      "option": "nodev"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var/log`（或解析 /proc/self/mounts 中掛載點恰為 /var/log 的列）的選項清單須包含 nodev；(2) 持久設定也須包含 nodev：/etc/fstab 中掛載點為 /var/log 的有效列第 4 欄。兩者皆符合才合格；若 /var/log 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var/log 的列第 4 欄附加「,nodev」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nodev /var/log` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var/log`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var/log 為獨立掛載點",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0020",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var/log 列的第 4 欄加入「,nosuid」，再執行 `mount -o remount,nosuid /var/log`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/log",
+      "option": "nosuid"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var/log`（或解析 /proc/self/mounts 中掛載點恰為 /var/log 的列）的選項清單須包含 nosuid；(2) 持久設定也須包含 nosuid：/etc/fstab 中掛載點為 /var/log 的有效列第 4 欄。兩者皆符合才合格；若 /var/log 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var/log 的列第 4 欄附加「,nosuid」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nosuid /var/log` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var/log`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var/log 為獨立掛載點",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0021",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log 目錄之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var/log 列的第 4 欄加入「,noexec」，再執行 `mount -o remount,noexec /var/log`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/log",
+      "option": "noexec"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var/log`（或解析 /proc/self/mounts 中掛載點恰為 /var/log 的列）的選項清單須包含 noexec；(2) 持久設定也須包含 noexec：/etc/fstab 中掛載點為 /var/log 的有效列第 4 欄。兩者皆符合才合格；若 /var/log 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var/log 的列第 4 欄附加「,noexec」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,noexec /var/log` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var/log`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var/log 為獨立掛載點",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0022",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log/audit 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新安裝系統於安裝時為 /var/log/audit 建立獨立磁區；已安裝系統先全系統備份，再以 LVM 建立，範例：gdisk /dev/sda（n、3、First sector 按 enter、Last sector +256M、Hex code 8e00、w）→ partprobe → pvcreate /dev/sda3 → vgcreate -s 16M varlogadvg /dev/sda3 → vgdisplay（Total PE 15）→ lvcreate -l 15 -n varlogadlv varlogadvg → mkfs.xfs /dev/varlogadvg/varlogadlv；於 /etc/fstab 新增「/dev/varlogadvg/varlogadlv /var/log/audit xfs defaults 0 0」",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/var/log/audit"
+    },
+    "check": "執行 `findmnt -kn /var/log/audit`（或解析 /proc/self/mounts），須有掛載點恰為 /var/log/audit 的掛載，且不是 bind mount（SOURCE 不含 [子路徑]）；同時 /etc/fstab 須有掛載點為 /var/log/audit 的有效列。皆符合才合格",
+    "fix": "不自動修復；輸出文件中的 LVM 步驟與建議，由管理員於維護時段備份後人工重新規劃磁區、搬移資料",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移既有資料，無法安全自動化。",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設安裝只建立單一根磁區（LVM 時為 ubuntu-vg/ubuntu-lv），此項預設不合格。文件範例 256MB 僅為示意，實務容量遠不足；Ubuntu 預設檔案系統為 ext4，不必使用 xfs。Ubuntu 22.04 預設未安裝 auditd，/var/log/audit 可能不存在"
+  },
+  {
+    "id": "TWGCB-01-014-0023",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log/audit 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var/log/audit 列的第 4 欄加入「,nodev」，再執行 `mount -o remount,nodev /var/log/audit`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/log/audit",
+      "option": "nodev"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var/log/audit`（或解析 /proc/self/mounts 中掛載點恰為 /var/log/audit 的列）的選項清單須包含 nodev；(2) 持久設定也須包含 nodev：/etc/fstab 中掛載點為 /var/log/audit 的有效列第 4 欄。兩者皆符合才合格；若 /var/log/audit 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var/log/audit 的列第 4 欄附加「,nodev」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nodev /var/log/audit` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var/log/audit`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var/log/audit 為獨立掛載點",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0024",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log/audit 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var/log/audit 列的第 4 欄加入「,nosuid」，再執行 `mount -o remount,nosuid /var/log/audit`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/log/audit",
+      "option": "nosuid"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var/log/audit`（或解析 /proc/self/mounts 中掛載點恰為 /var/log/audit 的列）的選項清單須包含 nosuid；(2) 持久設定也須包含 nosuid：/etc/fstab 中掛載點為 /var/log/audit 的有效列第 4 欄。兩者皆符合才合格；若 /var/log/audit 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var/log/audit 的列第 4 欄附加「,nosuid」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nosuid /var/log/audit` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var/log/audit`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var/log/audit 為獨立掛載點",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0025",
+    "category": "磁碟與檔案系統",
+    "title": "設定/var/log/audit 目錄之 noexec 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /var/log/audit 列的第 4 欄加入「,noexec」，再執行 `mount -o remount,noexec /var/log/audit`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/var/log/audit",
+      "option": "noexec"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /var/log/audit`（或解析 /proc/self/mounts 中掛載點恰為 /var/log/audit 的列）的選項清單須包含 noexec；(2) 持久設定也須包含 noexec：/etc/fstab 中掛載點為 /var/log/audit 的有效列第 4 欄。兩者皆符合才合格；若 /var/log/audit 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /var/log/audit 的列第 4 欄附加「,noexec」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,noexec /var/log/audit` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /var/log/audit`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/var/log/audit 為獨立掛載點",
+    "notes": "此規則開頭文字在抽取檔中混入 0024 區塊，已重組"
+  },
+  {
+    "id": "TWGCB-01-014-0026",
+    "category": "磁碟與檔案系統",
+    "title": "設定/home 目錄之檔案系統",
+    "expected": "使用獨立之分割磁區或邏輯磁區",
+    "doc_method": "新安裝系統於安裝時為 /home 建立獨立磁區；已安裝系統先全系統備份，再以 LVM 建立，範例：gdisk /dev/sda（n、3、First sector 按 enter、Last sector +256M、Hex code 8e00、w）→ partprobe → pvcreate /dev/sda3 → vgcreate -s 16M homevg /dev/sda3 → vgdisplay（Total PE 15）→ lvcreate -l 15 -n homelv homevg → mkfs.xfs /dev/homevg/homelv；於 /etc/fstab 新增「/dev/homevg/homelv /home xfs defaults 0 0」",
+    "type": "separate_partition",
+    "params": {
+      "mount": "/home"
+    },
+    "check": "執行 `findmnt -kn /home`（或解析 /proc/self/mounts），須有掛載點恰為 /home 的掛載，且不是 bind mount（SOURCE 不含 [子路徑]）；同時 /etc/fstab 須有掛載點為 /home 的有效列。皆符合才合格",
+    "fix": "不自動修復；輸出文件中的 LVM 步驟與建議，由管理員於維護時段備份後人工重新規劃磁區、搬移資料",
+    "risk": "C",
+    "risk_reason": "需重新分割磁碟並搬移既有資料，無法安全自動化。",
+    "needs_reboot": true,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設安裝只建立單一根磁區（LVM 時為 ubuntu-vg/ubuntu-lv），此項預設不合格。文件範例 256MB 僅為示意，實務容量遠不足；Ubuntu 預設檔案系統為 ext4，不必使用 xfs"
+  },
+  {
+    "id": "TWGCB-01-014-0027",
+    "category": "磁碟與檔案系統",
+    "title": "設定/home 目錄之 nodev 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /home 列的第 4 欄加入「,nodev」，再執行 `mount -o remount,nodev /home`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/home",
+      "option": "nodev"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /home`（或解析 /proc/self/mounts 中掛載點恰為 /home 的列）的選項清單須包含 nodev；(2) 持久設定也須包含 nodev：/etc/fstab 中掛載點為 /home 的有效列第 4 欄。兩者皆符合才合格；若 /home 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /home 的列第 4 欄附加「,nodev」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nodev /home` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /home`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/home 為獨立掛載點",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0028",
+    "category": "磁碟與檔案系統",
+    "title": "設定/home 目錄之 nosuid 選項",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/fstab，在掛載點為 /home 列的第 4 欄加入「,nosuid」，再執行 `mount -o remount,nosuid /home`",
+    "type": "mount_option",
+    "params": {
+      "mount": "/home",
+      "option": "nosuid"
+    },
+    "check": "(1) `findmnt -kn -o OPTIONS /home`（或解析 /proc/self/mounts 中掛載點恰為 /home 的列）的選項清單須包含 nosuid；(2) 持久設定也須包含 nosuid：/etc/fstab 中掛載點為 /home 的有效列第 4 欄。兩者皆符合才合格；若 /home 不是獨立掛載點則回報不適用",
+    "fix": "備份 /etc/fstab；在掛載點為 /home 的列第 4 欄附加「,nosuid」（已存在則跳過，保留其他選項與註解）；以 `findmnt --verify` 驗證 fstab 語法，失敗即還原；執行 `mount -o remount,nosuid /home` 立即生效。回滾：還原 /etc/fstab 後執行 `mount -o remount /home`（依還原後設定重新掛載）",
+    "risk": "B",
+    "risk_reason": "修改 /etc/fstab 掛載選項，寫錯可能導致無法開機，且選項可能影響使用該目錄的服務。",
+    "needs_reboot": false,
+    "applies_when": "/home 為獨立掛載點",
+    "notes": "使用者家目錄中的 setuid 程式將失效，一般伺服器影響小"
+  }
+]

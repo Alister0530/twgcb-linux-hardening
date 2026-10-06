@@ -1,0 +1,1297 @@
+[
+ {
+  "key": "pwquality_retry",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0208",
+   "rhel9": "TWGCB-01-012-0206"
+  },
+  "category": "帳號與存取控制",
+  "title": "可設定通行碼次數",
+  "expected": "3 以下，但須大於 0（retry=3）",
+  "doc_method": "RHEL 8.4 以後與 RHEL 9：編輯 /etc/security/pwquality.conf 新增或修改「Retry = 3」。RHEL 8.3 以前：#authselect create-profile <profile 名稱> -b sssd --symlink-meta；#authselect select custom/<profile 名稱> with-sudo with-faillock without-nullok；再以腳本在 /etc/authselect/custom/<profile>/{system-auth,password-auth} 的「password requisite pam_pwquality.so」行加入或修改 retry=3，最後 authselect apply-changes。",
+  "version_diff": "RHEL 8.4（libpwquality 1.4.4）起 pwquality.conf 才支援 retry；RHEL 8.0–8.3 必須寫在 PAM 行（自訂 authselect profile）。RHEL 9 文件只列 pwquality.conf 做法。",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "retry",
+   "value": "3",
+   "cmp": "range",
+   "range": [
+    1,
+    3
+   ],
+   "sep": " = ",
+   "legacy_rhel8_lt_8_4": "PAM 行 pam_pwquality.so retry=3"
+  },
+  "check": "RHEL 8.4+ / 9：取 pwquality.conf 與 conf.d 中 retry 的最終值（鍵名不分大小寫，文件寫 Retry），需 1 ≤ 值 ≤ 3；同時檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 的 pam_pwquality.so 行，若帶 retry= 參數會覆寫設定檔，也必須在 1–3。RHEL 8.0–8.3：只看 PAM 行的 retry= 參數（未設定時模組預設為 1，亦符合 1–3；但仍依文件要求判斷是否明確設定，建議以 PAM 實際值判定）。",
+  "fix": "RHEL 8.4+ / 9：備份後在 /etc/security/pwquality.conf 寫入「retry = 3」（使用小寫鍵名），註解 conf.d 中不合格的 retry 行；PAM 行若帶不合格的 retry=，不自動改，標 partial 提示人工。RHEL 8.0–8.3：不自動修復（ManualRequired），提示依文件建立自訂 authselect profile。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "8.4+/9 只改 pwquality 設定檔；8.3 以前需改 PAM，改列人工處理。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件寫「Retry = 3」，libpwquality 實際鍵名為小寫 retry，建議寫小寫並以不分大小寫比對。pam_pwquality 未設定 retry 時預設為 1，也在「3 以下但大於 0」範圍內，但多數稽核會要求明確設定。RHEL 8.3 以前的腳本會直接修改自訂 profile，必須先 authselect select 自訂 profile，否則改的是 /etc/authselect/ 下的產生檔，下次 apply-changes 會被覆寫。"
+ },
+ {
+  "key": "pwquality_enforce_for_root",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0209",
+   "rhel9": "TWGCB-01-012-0207"
+  },
+  "category": "帳號與存取控制",
+  "title": "強制 root 通行碼須符合通行碼規則",
+  "expected": "啟用（enforce_for_root）",
+  "doc_method": "#authselect create-profile <profile 名稱> -b sssd --symlink-meta；#authselect select custom/<profile 名稱> with-sudo with-faillock without-nullok；以腳本在 /etc/authselect/custom/<profile>/{system-auth,password-auth} 的「password requisite pam_pwquality.so」行尾加入 enforce_for_root，最後 authselect apply-changes。",
+  "version_diff": "兩版文件做法相同（皆用自訂 authselect profile 修改 PAM 行）。",
+  "type": "pam",
+  "params": {
+   "param": "enforce_for_root",
+   "pam_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ],
+   "alt_conf": "/etc/security/pwquality.conf(.d) 中的 enforce_for_root 行（RHEL 8.4+ / 9）"
+  },
+  "check": "符合下列任一即合格：(1) /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行都帶 enforce_for_root；(2) RHEL 8.4+ / 9：pwquality.conf 或 pwquality.conf.d/*.conf 有未註解的 enforce_for_root 行（libpwquality 1.4.4 起支援，效果相同）。",
+  "fix": "RHEL 8.4+ / 9：優先使用不動 PAM 的做法，備份後在 /etc/security/pwquality.conf 新增一行「enforce_for_root」（無值的旗標），回滾時還原備份。RHEL 8.0–8.3（設定檔不支援此旗標）：需使用 authselect 自訂 profile（authselect create-profile gcb -b <目前 profile> --symlink-meta → 修改 /etc/authselect/custom/gcb/{system-auth,password-auth} 的 pam_pwquality 行 → authselect select custom/gcb <原 features> → authselect apply-changes），預設不自動執行（ManualRequired）。回滾：authselect select 回原 profile 與 features，還原備份的 /etc/authselect/*。",
+  "risk": "A",
+  "risk_reason": "（實作改為 A 類，原分析為 B 類，以程式為準）8.3 以前只能修改 PAM 堆疊，寫錯可能導致無法變更通行碼或登入；8.4+/9 的設定檔做法風險低。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "與文件做法不同但效果相同：pwquality.conf 的 enforce_for_root 旗標在 RHEL 8.4+/9 可用，避免為一個參數改用自訂 profile。若實作採設定檔做法，8.4+/9 可視為 A 類。文件指令會一併套用 with-sudo with-faillock without-nullok，會改變既有 features，不建議照抄。"
+ },
+ {
+  "key": "pass_min_len",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0210",
+   "rhel9": "TWGCB-01-012-0208"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼最小長度",
+  "expected": "12 個字元以上（login.defs PASS_MIN_LEN 12、pwquality minlen = 12）",
+  "doc_method": "編輯 /etc/login.defs：PASS_MIN_LEN 12；編輯 /etc/security/pwquality.conf：minlen = 12",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "items": [
+    {
+     "path": "/etc/login.defs",
+     "key": "PASS_MIN_LEN",
+     "value": "12",
+     "cmp": "ge"
+    },
+    {
+     "path": "/etc/security/pwquality.conf",
+     "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+     "key": "minlen",
+     "value": "12",
+     "cmp": "ge",
+     "sep": " = "
+    }
+   ]
+  },
+  "check": "已實作（gcb/rules/common.py PassMinLen）：login.defs PASS_MIN_LEN ≥ 12；pwquality.conf 主檔 minlen ≥ 12 且所有 conf.d 中的 minlen 都 ≥ 12；/etc/pam.d/system-auth 與 /etc/pam.d/password-auth 的 pam_pwquality.so 行若有 minlen= 低於 12 判不合格。",
+  "fix": "已實作：備份後修改 pwquality.conf minlen = 12、註解 conf.d 中不合格值、login.defs PASS_MIN_LEN 12；PAM 行覆寫值標 partial 交人工。回滾：還原備份。",
+  "risk": "A",
+  "risk_reason": "只改設定檔，影響之後的通行碼變更。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": true,
+  "notes": "PAM 系統下 login.defs 的 PASS_MIN_LEN 實際不生效（shadow-utils 以 PAM 編譯），僅為符合文件要求一併設定。"
+ },
+ {
+  "key": "pwquality_minclass",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0211",
+   "rhel9": "TWGCB-01-012-0209"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼必須至少包含字元類別數量",
+  "expected": "4",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：minclass = 4",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "minclass",
+   "value": "4",
+   "cmp": "ge",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 minclass 的最終有效值，需 值 ≥ 4（最大即 4）；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 minclass= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「minclass = 4」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 minclass 行，備份該檔後註解掉。PAM 行上的 minclass= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "pwquality_dcredit",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0212",
+   "rhel9": "TWGCB-01-012-0210"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼必須至少包含數字個數",
+  "expected": "1 個以上（dcredit = -1）",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：dcredit = -1",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "dcredit",
+   "value": "-1",
+   "cmp": "le",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 dcredit 的最終有效值，需 值 ≤ -1；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 dcredit= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「dcredit = -1」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 dcredit 行，備份該檔後註解掉。PAM 行上的 dcredit= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "pwquality_ucredit",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0213",
+   "rhel9": "TWGCB-01-012-0211"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼必須至少包含大寫字母個數",
+  "expected": "1 個以上（ucredit = -1）",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：ucredit = -1",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "ucredit",
+   "value": "-1",
+   "cmp": "le",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 ucredit 的最終有效值，需 值 ≤ -1；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 ucredit= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「ucredit = -1」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 ucredit 行，備份該檔後註解掉。PAM 行上的 ucredit= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "pwquality_lcredit",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0214",
+   "rhel9": "TWGCB-01-012-0212"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼必須至少包含小寫字母個數",
+  "expected": "1 個以上（lcredit = -1）",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：lcredit = -1",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "lcredit",
+   "value": "-1",
+   "cmp": "le",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 lcredit 的最終有效值，需 值 ≤ -1；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 lcredit= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「lcredit = -1」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 lcredit 行，備份該檔後註解掉。PAM 行上的 lcredit= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "pwquality_ocredit",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0215",
+   "rhel9": "TWGCB-01-012-0213"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼必須至少包含特殊字元個數",
+  "expected": "1 個以上（ocredit = -1）",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：ocredit = -1",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "ocredit",
+   "value": "-1",
+   "cmp": "le",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 ocredit 的最終有效值，需 值 ≤ -1；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 ocredit= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「ocredit = -1」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 ocredit 行，備份該檔後註解掉。PAM 行上的 ocredit= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件說明誤植「每出現 1 個小寫字母時 Length credit 加 1」，應為特殊字元；RHEL 8 文件 GCB 設定值欄有 PDF 拆字殘留「1 個 3 以上」，正確為「1 個以上」。"
+ },
+ {
+  "key": "pwquality_difok",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0216",
+   "rhel9": "TWGCB-01-012-0214"
+  },
+  "category": "帳號與存取控制",
+  "title": "新通行碼與舊通行碼最少相異字元數",
+  "expected": "3 以上（difok = 3）",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：difok = 3",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "difok",
+   "value": "3",
+   "cmp": "ge",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 difok 的最終有效值，需 值 ≥ 3；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 difok= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「difok = 3」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 difok 行，備份該檔後註解掉。PAM 行上的 difok= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "pwquality_maxclassrepeat",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0217",
+   "rhel9": "TWGCB-01-012-0215"
+  },
+  "category": "帳號與存取控制",
+  "title": "同一類別字元可連續使用個數",
+  "expected": "4 以下，但須大於 0（maxclassrepeat = 4）",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：maxclassrepeat = 4",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "maxclassrepeat",
+   "value": "4",
+   "cmp": "range",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 maxclassrepeat 的最終有效值，需 1 ≤ 值 ≤ 4（0 代表停用檢查，不合格）；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 maxclassrepeat= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「maxclassrepeat = 4」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 maxclassrepeat 行，備份該檔後註解掉。PAM 行上的 maxclassrepeat= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "pwquality_maxrepeat",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0218",
+   "rhel9": "TWGCB-01-012-0216"
+  },
+  "category": "帳號與存取控制",
+  "title": "相同字元可連續使用個數",
+  "expected": "3 以下，但須大於 0（maxrepeat = 3）",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：maxrepeat = 3",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "maxrepeat",
+   "value": "3",
+   "cmp": "range",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 maxrepeat 的最終有效值，需 1 ≤ 值 ≤ 3（0 代表停用檢查，不合格）；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 maxrepeat= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「maxrepeat = 3」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 maxrepeat 行，備份該檔後註解掉。PAM 行上的 maxrepeat= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "pwquality_dictcheck",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0219",
+   "rhel9": "TWGCB-01-012-0217"
+  },
+  "category": "帳號與存取控制",
+  "title": "必須禁止使用字典檔單字做為通行碼",
+  "expected": "1（dictcheck=1）",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：dictcheck=1",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "dictcheck",
+   "value": "1",
+   "cmp": "eq",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 dictcheck 的最終有效值，需 值 = 1（未設定時預設為 1，視為合格）；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 dictcheck= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「dictcheck = 1」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 dictcheck 行，備份該檔後註解掉。PAM 行上的 dictcheck= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "libpwquality 預設 dictcheck=1，未設定也等同合格；修復仍明確寫入。文件寫法無空白（dictcheck=1），兩種寫法皆可解析。"
+ },
+ {
+  "key": "faillock_deny",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0220",
+   "rhel9": "TWGCB-01-012-0218"
+  },
+  "category": "帳號與存取控制",
+  "title": "帳戶鎖定閾值",
+  "expected": "5 次以下，但須大於 0（deny=5）",
+  "doc_method": "RHEL 8.2 以後與 RHEL 9：編輯 /etc/security/faillock.conf 新增或修改「deny=5」（RHEL 9 文件寫「deny = 5」）。RHEL 8.1 以前：建立並選用自訂 authselect profile（with-sudo with-faillock without-nullok），以腳本在 system-auth 與 password-auth 的 「auth required pam_faillock.so」行加入或修改 deny=5，再 authselect apply-changes。",
+  "version_diff": "RHEL 8.2（pam 1.3.1-8）起提供 /etc/security/faillock.conf；RHEL 8.0/8.1 只能在 PAM 行（自訂 authselect profile）帶 deny= 參數。RHEL 9 文件僅列 faillock.conf 做法。",
+  "type": "pam",
+  "params": {
+   "conf": "/etc/security/faillock.conf",
+   "key": "deny",
+   "range": [
+    1,
+    5
+   ],
+   "authselect_feature": "with-faillock"
+  },
+  "check": "已實作（common.py Faillock）：faillock.conf 的 deny 需 1–5，且 system-auth、password-auth 都有 pam_faillock 行。建議補強：PAM 行若帶 deny= 參數會覆寫設定檔，也要檢查。",
+  "fix": "已實作：RHEL 8.0/8.1 → ManualRequired；其餘先寫入 faillock.conf「deny = 5」，若 pam_faillock 未啟用且系統使用 authselect，備份 /etc/authselect/* 後執行 authselect enable-feature with-faillock（回滾：authselect disable-feature with-faillock 並還原備份）；未使用 authselect → ManualRequired。",
+  "risk": "B",
+  "risk_reason": "啟用 pam_faillock 會改變 PAM 認證堆疊，可能造成帳號被鎖或登入失敗。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": true,
+  "notes": "文件 8.1 以前腳本中的 sed 寫成「s/^\\^\\s*(auth…」多了一個 \\^，且結尾重複「$PTF $PTF」，照抄無法正確新增參數。"
+ },
+ {
+  "key": "faillock_unlock_time",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0221",
+   "rhel9": "TWGCB-01-012-0219"
+  },
+  "category": "帳號與存取控制",
+  "title": "帳戶鎖定時間",
+  "expected": "900 秒以上（unlock_time=900）",
+  "doc_method": "RHEL 8.2 以後與 RHEL 9：編輯 /etc/security/faillock.conf 新增或修改「unlock_time = 900」。RHEL 8.1 以前：自訂 authselect profile，以腳本在 system-auth 與 password-auth 的「auth required pam_faillock.so」行加入或修改 unlock_time=900，再 authselect apply-changes。解鎖：#faillock --user <帳號> --reset",
+  "version_diff": "同帳戶鎖定閾值：RHEL 8.0/8.1 無 faillock.conf，需改 PAM 行；RHEL 8.2+ / 9 使用 faillock.conf。",
+  "type": "pam",
+  "params": {
+   "conf": "/etc/security/faillock.conf",
+   "key": "unlock_time",
+   "cmp": "ge",
+   "value": 900,
+   "authselect_feature": "with-faillock"
+  },
+  "check": "讀取 /etc/security/faillock.conf 的 unlock_time（忽略註解），需 ≥ 900，或為 0／never（永久鎖定，比要求嚴格，判合格並註記）；PAM 行若帶 unlock_time= 也需符合；並確認 pam_faillock 已啟用：/etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中有未註解的 auth … pam_faillock.so（preauth 與 authfail）與 account required pam_faillock.so 行（authselect current 會列出 with-faillock）；未啟用時設定檔不生效，判不合格。",
+  "fix": "RHEL 8.0/8.1：ManualRequired（需自訂 authselect profile）。RHEL 8.2+ / 9：備份後在 faillock.conf 寫入「unlock_time = 900」（取代既有未註解行）；若 pam_faillock 未啟用，沿用 Faillock 規則的做法（備份 /etc/authselect/* → authselect enable-feature with-faillock，回滾 disable-feature 並還原）。回滾：還原 faillock.conf。",
+  "risk": "B",
+  "risk_reason": "與 pam_faillock 啟用綁在一起，鎖定時間變長也會影響被誤鎖的帳號。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "未設定時 pam_faillock 預設 unlock_time=600，不合格。unlock_time=0 代表需管理者手動解鎖，是否接受請專案決定（本規格建議視為合格）。建議與 deny 規則共用 pam_faillock 啟用邏輯，避免重複 enable-feature。"
+ },
+ {
+  "key": "pam_pwhistory_remember",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0222",
+   "rhel9": "TWGCB-01-012-0220"
+  },
+  "category": "帳號與存取控制",
+  "title": "強制執行通行碼歷程記錄",
+  "expected": "3 以上（remember=3）",
+  "doc_method": "#authselect create-profile <profile 名稱> -b sssd --symlink-meta；#authselect select custom/<profile 名稱> with-sudo with-faillock without-nullok；以腳本在 /etc/authselect/custom/<profile>/system-auth 的「password requisite pam_pwquality.so」或「password sufficient pam_unix.so」行加入或修改 remember=3，最後 authselect apply-changes。",
+  "version_diff": "兩版文件做法相同。實務上 RHEL 9（authselect 1.2.6+、pam 1.5）可用 authselect enable-feature with-pwhistory 加上 /etc/security/pwhistory.conf 的 remember = 3；RHEL 8 的 with-pwhistory feature 與 pwhistory.conf 僅在較新小版本（約 8.6/8.7 以後）提供，舊版仍需自訂 profile。",
+  "type": "pam",
+  "params": {
+   "param": "remember",
+   "cmp": "ge",
+   "value": 3,
+   "pam_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ],
+   "modules": [
+    "pam_pwhistory.so",
+    "pam_unix.so"
+   ],
+   "alt_conf": "/etc/security/pwhistory.conf"
+  },
+  "check": "檢查 /etc/pam.d/system-auth（建議也檢查 password-auth）未註解的 password 行：pam_pwhistory.so 或 pam_unix.so 帶 remember=N 且 N ≥ 3 即合格；若 pam_pwhistory.so 存在但無 remember 參數，再讀 /etc/security/pwhistory.conf 的 remember（存在時）需 ≥ 3。",
+  "fix": "若 `authselect list-features <目前 profile>` 包含 with-pwhistory 且存在 /etc/security/pwhistory.conf：備份 pwhistory.conf 與 /etc/authselect/* 後寫入「remember = 3」，執行 authselect enable-feature with-pwhistory（回滾：disable-feature with-pwhistory、還原備份）。否則（舊版 RHEL 8）需自訂 authselect profile，不自動執行，ManualRequired。系統未使用 authselect → ManualRequired。注意：/etc/security/opasswd 需存在且為 root:root 0600（pam_pwhistory/pam_unix 會自動建立）。",
+  "risk": "B",
+  "risk_reason": "需修改 PAM password 堆疊，錯誤會導致無法變更通行碼。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件腳本的 sed 會把 remember=3 同時加到 pam_pwquality.so 行（pam_pwquality 不認得此參數，只會記錄警告），屬文件瑕疵；且只處理 system-auth，未處理 password-auth（遠端登入改密碼走 password-auth）。with-pwhistory 是否可用請以 authselect list-features 實測確認。"
+ },
+ {
+  "key": "pam_lastlog_showfailed",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0223",
+   "rhel9": "TWGCB-01-012-0221"
+  },
+  "category": "帳號與存取控制",
+  "title": "顯示登入失敗次數與日期",
+  "expected": "啟用（pam_lastlog.so showfailed）",
+  "doc_method": "編輯 /etc/pam.d/postlogin，新增或修改以下內容至檔案最上方：session required pam_lastlog.so showfailed",
+  "version_diff": "兩版文件相同。RHEL 9 的 pam_lastlog 已標示為 deprecated（仍隨 pam 套件提供），未來版本可能移除。",
+  "type": "pam",
+  "params": {
+   "pam_file": "/etc/pam.d/postlogin",
+   "line": "session required pam_lastlog.so showfailed"
+  },
+  "check": "讀取 /etc/pam.d/postlogin（authselect 管理時為指向 /etc/authselect/postlogin 的符號連結），有未註解的 session 行使用 pam_lastlog.so 且帶 showfailed 參數即合格。authselect 預設 postlogin 已含「session optional pam_lastlog.so silent noupdate showfailed」與「session [default=1] pam_lastlog.so nowtmp showfailed」，通常已合格。",
+  "fix": "合格時不動作。不合格且使用 authselect：不可直接修改 /etc/pam.d/postlogin（會被 authselect 覆寫並使 authselect check 失敗），需自訂 profile（authselect create-profile gcb -b <目前 profile> --symlink-meta，複製並修改 postlogin 加入 showfailed，authselect select custom/gcb <原 features>），預設 ManualRequired。未使用 authselect：備份後在檔案最上方插入文件所列行，回滾還原備份。",
+  "risk": "B",
+  "risk_reason": "修改 PAM session 堆疊；required 的 pam_lastlog 若失敗會阻擋登入。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件要求以 required 加在最上方；authselect 預設以 optional/[default=1] 方式啟用 showfailed，功能相同，建議以參數判定而非逐字比對控制旗標。"
+ },
+ {
+  "key": "password_hash_sha512",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0224",
+   "rhel9": "TWGCB-01-012-0222"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼雜湊演算法",
+  "expected": "SHA512",
+  "doc_method": "編輯 /etc/libuser.conf：crypt_style = sha512；編輯 /etc/login.defs：ENCRYPT_METHOD SHA512；建立並選用自訂 authselect profile，以腳本確保 system-auth 與 password-auth 的「password sufficient pam_unix.so」行帶 sha512，最後 authselect apply-changes。",
+  "version_diff": "兩版文件相同。RHEL 8/9 預設皆為 SHA512（RHEL 9 支援 yescrypt 但預設不使用）。",
+  "type": "custom",
+  "params": {
+   "items": [
+    {
+     "path": "/etc/libuser.conf",
+     "section": "defaults",
+     "key": "crypt_style",
+     "value": "sha512",
+     "cmp": "eq_icase"
+    },
+    {
+     "path": "/etc/login.defs",
+     "key": "ENCRYPT_METHOD",
+     "value": "SHA512",
+     "cmp": "eq_icase"
+    },
+    {
+     "pam_files": [
+      "/etc/pam.d/system-auth",
+      "/etc/pam.d/password-auth"
+     ],
+     "module": "pam_unix.so",
+     "type": "password",
+     "param": "sha512"
+    }
+   ]
+  },
+  "check": "三項都需符合：(1) /etc/libuser.conf [defaults] 段落 crypt_style 為 sha512（不分大小寫）；(2) /etc/login.defs ENCRYPT_METHOD 為 SHA512；(3) /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 未註解的 password … pam_unix.so 行帶 sha512 參數（且未帶 md5/blowfish/yescrypt 等其他雜湊參數）。",
+  "fix": "(1)(2) 備份後直接修改檔案（libuser.conf 只改 [defaults] 段落內的 crypt_style 行；login.defs 改 ENCRYPT_METHOD），回滾還原備份。(3) authselect 內建 profile 已帶 sha512，若不符代表 PAM 曾被手改或使用自訂 profile → ManualRequired，不自動修改 PAM。",
+  "risk": "A",
+  "risk_reason": "（實作改為 A 類，原分析為 B 類，以程式為準）雜湊參數位於 PAM password 堆疊，修改 PAM 需人工；設定檔部分風險低。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "變更雜湊演算法只影響之後設定的通行碼，既有雜湊不會轉換。"
+ },
+ {
+  "key": "pass_min_days",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0225",
+   "rhel9": "TWGCB-01-012-0223"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼最短使用期限",
+  "expected": "1 天以上（PASS_MIN_DAYS 1）",
+  "doc_method": "編輯 /etc/login.defs：PASS_MIN_DAYS 1；對設定前已存在的帳號執行 #chage --mindays 1 (使用者帳號名稱)",
+  "version_diff": "",
+  "type": "login_defs",
+  "params": {
+   "key": "PASS_MIN_DAYS",
+   "value": "1",
+   "cmp": "ge",
+   "shadow_field": 4,
+   "chage": "--mindays 1"
+  },
+  "check": "login.defs 的 PASS_MIN_DAYS ≥ 1；且 既有帳號範圍：/etc/shadow 中通行碼欄可用（非 !、*、!! 開頭且非空）的帳號，與 PassMaxDays 規則一致；鎖定或無通行碼帳號不處理。 這些帳號 /etc/shadow 第 4 欄（mindays）需 ≥ 1。",
+  "fix": "備份 /etc/login.defs，設定「PASS_MIN_DAYS\t1」；對不合格帳號，先在回滾日誌記錄原 mindays，再執行 chage --mindays 1 <帳號>。回滾：還原 login.defs，逐一 chage --mindays <原值>（原值空白時用 0）。",
+  "risk": "A",
+  "risk_reason": "只限制改密碼的頻率，不會讓帳號過期或鎖定。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "目前 fixer.chage_max 與 journal 的 chage 回滾只記錄 max，需擴充為可記錄 min/warn/inactive 欄位。"
+ },
+ {
+  "key": "pass_warn_age",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0226",
+   "rhel9": "TWGCB-01-012-0224"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼到期前提醒使用者變更通行碼",
+  "expected": "14 天以上（PASS_WARN_AGE 14）",
+  "doc_method": "編輯 /etc/login.defs：PASS_WARN_AGE 14；對既有帳號執行 #chage --warndays 14 (使用者帳號名稱)",
+  "version_diff": "",
+  "type": "login_defs",
+  "params": {
+   "key": "PASS_WARN_AGE",
+   "value": "14",
+   "cmp": "ge",
+   "shadow_field": 6,
+   "chage": "--warndays 14"
+  },
+  "check": "login.defs 的 PASS_WARN_AGE ≥ 14；且 既有帳號範圍：/etc/shadow 中通行碼欄可用（非 !、*、!! 開頭且非空）的帳號，與 PassMaxDays 規則一致；鎖定或無通行碼帳號不處理。 這些帳號 /etc/shadow 第 6 欄（warndays）需 ≥ 14。",
+  "fix": "備份 /etc/login.defs，設定「PASS_WARN_AGE\t14」；對不合格帳號記錄原值後執行 chage --warndays 14 <帳號>。回滾：還原 login.defs，chage --warndays <原值>（空白用 7）。",
+  "risk": "A",
+  "risk_reason": "只改提醒天數，不影響登入。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 8 文件的 PDF 斷行把標題拆成「密碼到期前提醒使…用者變更密碼」，已重組。"
+ },
+ {
+  "key": "pass_max_days",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0227",
+   "rhel9": "TWGCB-01-012-0225"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼最長使用期限",
+  "expected": "90 天以下，但須大於 0（PASS_MAX_DAYS 90）",
+  "doc_method": "編輯 /etc/login.defs：PASS_MAX_DAYS 90；對既有帳號執行 #chage --maxdays 90 (使用者帳號名稱)",
+  "version_diff": "",
+  "type": "login_defs",
+  "params": {
+   "key": "PASS_MAX_DAYS",
+   "value": "90",
+   "cmp": "range",
+   "range": [
+    1,
+    90
+   ],
+   "shadow_field": 5,
+   "chage": "--maxdays 90"
+  },
+  "check": "已實作（common.py PassMaxDays）：login.defs PASS_MAX_DAYS 1–90，且可用通行碼帳號的 shadow 第 5 欄在 1–90。",
+  "fix": "已實作：備份 login.defs 改為 90；逐一 chage --maxdays 90（journal 記錄原值，回滾 chage -M <原值或 -1>）。避免立即過期：若帳號通行碼已使用 ≥ 90 天（今天 − shadow 第 3 欄 lastchg），套用後會立刻過期，預設略過並標 partial，需 --include-risky 才處理。",
+  "risk": "A",
+  "risk_reason": "已實作；已透過略過「套用後立即過期」帳號來避免影響登入。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": true,
+  "notes": "已實作規則未明確設定 risk（預設 A），但對立即過期的帳號已有保護。"
+ },
+ {
+  "key": "account_inactive",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0228",
+   "rhel9": "TWGCB-01-012-0226"
+  },
+  "category": "帳號與存取控制",
+  "title": "通行碼到期後，帳號停用前之天數",
+  "expected": "30 天以下，但須大於 0（INACTIVE 30）",
+  "doc_method": "#useradd -D -f 30；對既有帳號執行 #chage --inactive 30 (使用者帳號名稱)",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "default_file": "/etc/default/useradd",
+   "key": "INACTIVE",
+   "range": [
+    1,
+    30
+   ],
+   "shadow_field": 7,
+   "chage": "--inactive 30"
+  },
+  "check": "`useradd -D` 輸出（或 /etc/default/useradd）的 INACTIVE 需在 1–30（-1 代表停用，不合格）；且 既有帳號範圍：/etc/shadow 中通行碼欄可用（非 !、*、!! 開頭且非空）的帳號，與 PassMaxDays 規則一致；鎖定或無通行碼帳號不處理。 這些帳號 /etc/shadow 第 7 欄需在 1–30。",
+  "fix": "備份 /etc/default/useradd 後執行 useradd -D -f 30。對不合格帳號，記錄原第 7 欄後執行 chage --inactive 30 <帳號>。避免立即停用：若 lastchg + maxdays + 30 ≤ 今天（通行碼已過期超過 30 天，或 maxdays 會先被 0227 改成 90），套用後帳號會立即停用，預設略過並標 partial，需 --include-risky 才處理（與 PassMaxDays 相同的保護）。回滾：還原 /etc/default/useradd，chage --inactive <原值，空白用 -1>。",
+  "risk": "B",
+  "risk_reason": "對通行碼早已過期的帳號套用會立即停用帳號，影響登入。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "應在 PASS_MAX_DAYS 規則之後評估，因 maxdays 改為 90 後到期日會提前。服務帳號若靠 SSH 金鑰登入，通行碼過期與停用仍可能阻擋登入（帳號過期會讓 pam_unix account 失敗），需特別注意。"
+ },
+ {
+  "key": "login_fail_delay",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0229",
+   "rhel9": "TWGCB-01-012-0227"
+  },
+  "category": "帳號與存取控制",
+  "title": "登入嘗試失敗之延遲時間",
+  "expected": "4 秒以上（FAIL_DELAY 4）",
+  "doc_method": "編輯 /etc/login.defs，將 FAIL_DELAY 設為 4 以上，例如：FAIL_DELAY 4",
+  "version_diff": "",
+  "type": "login_defs",
+  "params": {
+   "key": "FAIL_DELAY",
+   "value": "4",
+   "cmp": "ge"
+  },
+  "check": "/etc/login.defs 中 FAIL_DELAY 的最終未註解值 ≥ 4。",
+  "fix": "備份 /etc/login.defs，新增或修改「FAIL_DELAY\t4」。回滾：還原備份。",
+  "risk": "A",
+  "risk_reason": "只改設定檔數值。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 的 shadow-utils 以 PAM 編譯，login.defs 的 FAIL_DELAY 實際不生效（延遲由 pam_faildelay/pam_unix 控制）；依文件只檢查設定值。"
+ },
+ {
+  "key": "login_create_home",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0230",
+   "rhel9": "TWGCB-01-012-0228"
+  },
+  "category": "帳號與存取控制",
+  "title": "新使用者帳號預設建立使用者家目錄",
+  "expected": "yes（CREATE_HOME yes）",
+  "doc_method": "編輯 /etc/login.defs：CREATE_HOME yes",
+  "version_diff": "",
+  "type": "login_defs",
+  "params": {
+   "key": "CREATE_HOME",
+   "value": "yes",
+   "cmp": "eq_icase"
+  },
+  "check": "/etc/login.defs 中 CREATE_HOME 為 yes（不分大小寫）。",
+  "fix": "備份 /etc/login.defs，新增或修改「CREATE_HOME\tyes」。回滾：還原備份。",
+  "risk": "A",
+  "risk_reason": "只影響之後新增的帳號。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 8/9 預設已為 yes。"
+ },
+ {
+  "key": "sudo_require_auth",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0231",
+   "rhel9": "TWGCB-01-012-0229"
+  },
+  "category": "帳號與存取控制",
+  "title": "要求使用者必須經過身分鑑別才能提升權限",
+  "expected": "要求身分鑑別（無 NOPASSWD 或 !authenticate）",
+  "doc_method": "#egrep -i '(nopasswd|!authenticate)' /etc/sudoers /etc/sudoers.d/*；以 visudo -f 編輯 /etc/sudoers 或 /etc/sudoers.d/ 下的檔案，將包含 NOPASSWD 或 !authenticate 的行註解(#)或刪除。",
+  "version_diff": "RHEL 9 文件用語為「身分鑑別」，RHEL 8 為「身分驗證」，內容相同。",
+  "type": "custom",
+  "params": {
+   "files": [
+    "/etc/sudoers",
+    "/etc/sudoers.d/*"
+   ],
+   "pattern": "(nopasswd|!authenticate)",
+   "icase": true
+  },
+  "check": "讀取 /etc/sudoers 與 /etc/sudoers.d/ 下所有檔案（含 #includedir/@includedir 指向的目錄；略過以 ~ 結尾或含 . 的檔名，sudo 本身也不讀），排除註解行後，不分大小寫搜尋 NOPASSWD 或 !authenticate，有任一行即不合格並列出檔名與行。",
+  "fix": "預設不自動修復（列出違規行供人工確認）。人工確認後：備份檔案，在該行前加 #，並以 visudo -c -f <檔案> 檢查語法，失敗立即還原。回滾：還原備份。",
+  "risk": "C",
+  "risk_reason": "需人工判斷，移除 NOPASSWD 可能讓自動化帳號或沒有通行碼的帳號無法 sudo。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "雲端映像檔常見 /etc/sudoers.d/90-cloud-init-users 內有 ec2-user／cloud-user ALL=(ALL) NOPASSWD:ALL，且該帳號通常沒有通行碼，直接註解會失去管理權限。"
+ },
+ {
+  "key": "limits_maxlogins",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0232",
+   "rhel9": "TWGCB-01-012-0230"
+  },
+  "category": "帳號與存取控制",
+  "title": "限制每個帳號可同時登入之數量",
+  "expected": "10 以下，但須大於 0（* hard maxlogins 10）",
+  "doc_method": "編輯 /etc/security/limits.conf 或 /etc/security/limits.d/ 下的 .conf 檔，新增或修改：* hard maxlogins 10",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "files": [
+    "/etc/security/limits.conf",
+    "/etc/security/limits.d/*.conf"
+   ],
+   "line": "* hard maxlogins 10",
+   "range": [
+    1,
+    10
+   ],
+   "dropin": "/etc/security/limits.d/99-gcb.conf"
+  },
+  "check": "解析 limits.conf 與 limits.d/*.conf（依檔名排序，後者覆寫前者）中 domain 為 *、type 為 hard（或 -）、item 為 maxlogins 的行，最終值需為 1–10；並確認 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中有 session … pam_limits.so（authselect 預設已包含）。",
+  "fix": "建立 drop-in /etc/security/limits.d/99-gcb.conf（root:root 0644），內容「* hard maxlogins 10」；其他檔案中 * 的 maxlogins 若 > 10 或排序在後且不合格，備份後註解。回滾：刪除 drop-in、還原備份。",
+  "risk": "B",
+  "risk_reason": "可能限制帳號同時登入數，影響使用多重 session 的服務或自動化帳號。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "依 limits.conf 說明，萬用字元 * 不套用到 root，root 不受限。文件提醒：啟用後需確認各系統服務正常運作。"
+ },
+ {
+  "key": "pkg_kbd",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0233",
+   "rhel9": "TWGCB-01-012-0231"
+  },
+  "category": "帳號與存取控制",
+  "title": "kbd 套件",
+  "expected": "安裝",
+  "doc_method": "#dnf install kbd.x86_64",
+  "version_diff": "",
+  "type": "package_present",
+  "params": {
+   "pkg": "kbd"
+  },
+  "check": "rpm -q kbd 成功即合格。",
+  "fix": "dnf install -y kbd（不指定架構，相容 aarch64），記錄由本工具安裝；回滾時若原本未安裝則 dnf remove kbd（若有其他套件相依則不移除）。",
+  "risk": "A",
+  "risk_reason": "安裝套件，不改變既有服務。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件指定 kbd.x86_64，其他架構應直接用 kbd。RHEL 8/9 最小安裝通常已有 kbd（提供 vlock）。離線環境無法安裝時應回報人工處理。"
+ },
+ {
+  "key": "gnome_lock_enabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0234",
+   "rhel9": "TWGCB-01-012-0232"
+  },
+  "category": "帳號與存取控制",
+  "title": "使用者會談鎖定",
+  "expected": "啟用（lock-enabled=true）",
+  "doc_method": "建立或編輯 /etc/dconf/db/local.d/00-screensaver，在 [org/gnome/desktop/screensaver] 段落新增 lock-enabled=true，執行 #dconf update",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "file": "/etc/dconf/db/local.d/00-screensaver",
+   "section": "org/gnome/desktop/screensaver",
+   "key": "lock-enabled",
+   "value": "true"
+  },
+  "check": "不適用條件見 applies_when。解析 /etc/dconf/db/local.d/*（INI 格式），[org/gnome/desktop/screensaver] 的 lock-enabled 為 true；並確認 /etc/dconf/profile/user 含 system-db:local（否則本機資料庫不生效）。",
+  "fix": "備份後在 /etc/dconf/db/local.d/00-screensaver 的該段落寫入 lock-enabled=true；若 /etc/dconf/profile/user 不存在，建立內容「user-db:user\\nsystem-db:local」（記錄為新建，回滾時刪除）；執行 dconf update。回滾：還原／刪除檔案後再 dconf update。",
+  "risk": "A",
+  "risk_reason": "只影響圖形桌面螢幕鎖定。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 GNOME／gdm（rpm -q gdm 或存在 /usr/bin/gnome-shell）；純伺服器未安裝時判不適用",
+  "existing": false,
+  "notes": "文件未提及 /etc/dconf/profile/user 需含 system-db:local，若缺少則設定無效。"
+ },
+ {
+  "key": "gnome_idle_delay",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0235",
+   "rhel9": "TWGCB-01-012-0233"
+  },
+  "category": "帳號與存取控制",
+  "title": "GNOME 使用者會談逾時時間",
+  "expected": "900 秒以下，但須大於 0（idle-delay=uint32 900）",
+  "doc_method": "編輯 /etc/dconf/db/local.d/00-screensaver，在 [org/gnome/desktop/session] 段落新增 idle-delay=uint32 900，執行 #dconf update",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "file": "/etc/dconf/db/local.d/00-screensaver",
+   "section": "org/gnome/desktop/session",
+   "key": "idle-delay",
+   "value": "uint32 900",
+   "range": [
+    1,
+    900
+   ]
+  },
+  "check": "解析 /etc/dconf/db/local.d/*，[org/gnome/desktop/session] 的 idle-delay（去掉 uint32 前綴）需在 1–900；同樣確認 dconf profile。",
+  "fix": "同 gnome_lock_enabled：備份並寫入 idle-delay=uint32 900，必要時建立 dconf profile，執行 dconf update。回滾：還原後 dconf update。",
+  "risk": "A",
+  "risk_reason": "只影響圖形桌面閒置鎖定。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 GNOME／gdm（rpm -q gdm 或存在 /usr/bin/gnome-shell）；純伺服器未安裝時判不適用",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "gdm_no_autologin",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0236",
+   "rhel9": "TWGCB-01-012-0234"
+  },
+  "category": "帳號與存取控制",
+  "title": "禁止 GNOME 使用者自動登入",
+  "expected": "false（AutomaticLoginEnable=false）",
+  "doc_method": "編輯 /etc/gdm/custom.conf，在 [daemon] 段落新增或修改：AutomaticLoginEnable=false",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "file": "/etc/gdm/custom.conf",
+   "section": "daemon",
+   "key": "AutomaticLoginEnable",
+   "value": "false"
+  },
+  "check": "/etc/gdm/custom.conf 的 [daemon] 段落 AutomaticLoginEnable 為 false（不分大小寫）；未安裝 gdm 判不適用。",
+  "fix": "備份 /etc/gdm/custom.conf，在 [daemon] 段落寫入 AutomaticLoginEnable=false（段落不存在則新增）。回滾：還原備份。生效需重啟 gdm（不自動重啟，以免中斷桌面工作階段）。",
+  "risk": "A",
+  "risk_reason": "只影響圖形登入畫面。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 gdm（存在 /etc/gdm/custom.conf）",
+  "existing": false,
+  "notes": "文件段落名稱誤植為「daemon]」，正確為 [daemon]。"
+ },
+ {
+  "key": "system_accounts_nologin",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0237",
+   "rhel9": "TWGCB-01-012-0235"
+  },
+  "category": "帳號與存取控制",
+  "title": "系統帳號登入方式",
+  "expected": "nologin",
+  "doc_method": "設定 UID < UID_MIN 的系統帳號（root、sync、shutdown、halt 與 + 開頭除外）shell 為 $(which nologin)：awk -F: '($1!=\"root\" && $1!=\"sync\" && $1!=\"shutdown\" && $1!=\"halt\" && $1!~/^\\+/ && $3<UID_MIN && $7!=nologin && $7!=\"/bin/false\") {print $1}' /etc/passwd | while read user; do usermod -s $(which nologin) $user; done；並鎖定所有非 root 系統帳號：…| xargs -I '{}' passwd -S '{}' | awk '($2!=\"L\" && $2!=\"LK\")…' | while read user; do usermod -L $user; done",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "uid_min_from": "/etc/login.defs UID_MIN",
+   "exclude": [
+    "root",
+    "sync",
+    "shutdown",
+    "halt"
+   ],
+   "allowed_shells": [
+    "/sbin/nologin",
+    "/usr/sbin/nologin",
+    "/bin/false",
+    "/usr/bin/false"
+   ]
+  },
+  "check": "UID_MIN 取自 /etc/login.defs（預設 1000）。(1) /etc/passwd 中 UID < UID_MIN、名稱不是 root/sync/shutdown/halt、且不以 + 開頭的帳號，shell 需為 nologin 或 /bin/false；(2) 除 root 外 UID < UID_MIN 的帳號，/etc/shadow 通行碼欄需為鎖定狀態（以 ! 或 * 開頭，或 passwd -S 為 L/LK）。列出所有不合格帳號。",
+  "fix": "預設不自動修復（列出清單供人工確認）。人工確認後：備份 /etc/passwd、/etc/shadow，記錄每個帳號原 shell 與鎖定狀態，執行 usermod -s /usr/sbin/nologin <帳號>、usermod -L <帳號>。回滾：usermod -s <原 shell>；只對原本未鎖定者 usermod -U。",
+  "risk": "C",
+  "risk_reason": "需人工判斷帳號用途，部分服務帳號（如 postgres）需要可用 shell 供 su 使用。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 的 /sbin 為 /usr/sbin 的符號連結，比對 shell 時兩種路徑都要接受。文件說明以 UID 小於 1000 定義系統帳號，指令則讀 UID_MIN，應以 UID_MIN 為準。"
+ },
+ {
+  "key": "bash_tmout",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0238",
+   "rhel9": "TWGCB-01-012-0236"
+  },
+  "category": "帳號與存取控制",
+  "title": "Bash shell 閒置時登出時間",
+  "expected": "900 秒以下，但須大於 0（TMOUT=900）",
+  "doc_method": "編輯 /etc/bashrc：readonly TMOUT=900 ; export TMOUT；編輯 /etc/profile 或 /etc/profile.d/ 下的 .sh 檔：readonly TMOUT=900 ; export TMOUT",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "files": [
+    "/etc/bashrc",
+    "/etc/profile",
+    "/etc/profile.d/*.sh"
+   ],
+   "var": "TMOUT",
+   "range": [
+    1,
+    900
+   ],
+   "dropin": "/etc/profile.d/99-gcb-tmout.sh"
+  },
+  "check": "搜尋 /etc/bashrc、/etc/profile、/etc/profile.d/*.sh 中未註解的 TMOUT= 設定：至少一處設在 1–900，且需同時涵蓋 /etc/bashrc 與 profile（文件兩處都要求）；任何一處設定 > 900 或 0 判不合格。",
+  "fix": "建立 /etc/profile.d/99-gcb-tmout.sh（root:root 0644），並在 /etc/bashrc 末端加入以標記註解包住的同樣區塊，內容以防重複 readonly 的寫法：`if [ \"${TMOUT:-}\" != 900 ] || ! readonly -p | grep -q ' TMOUT='; then TMOUT=900; readonly TMOUT; export TMOUT; fi 2>/dev/null`。其他檔案有不合格值則備份後註解。回滾：刪除 drop-in，還原 /etc/bashrc 與其他備份檔。",
+  "risk": "A",
+  "risk_reason": "只影響互動式 shell 閒置登出，不影響服務。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "登入 shell 會先讀 /etc/profile.d 再讀 /etc/bashrc，兩處都寫 readonly TMOUT=900 會出現「TMOUT: readonly variable」錯誤訊息，需用條件判斷避免。長時間開著的互動 session（例如以 shell 監看工作）會被自動登出。"
+ },
+ {
+  "key": "gnome_lock_settings",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0239",
+   "rhel9": "TWGCB-01-012-0237"
+  },
+  "category": "帳號與存取控制",
+  "title": "防止修改圖形使用者介面(GUI)設定",
+  "expected": "啟用",
+  "doc_method": "建立或編輯 /etc/dconf/db/local.d/locks/session，新增或修改：/org/gnome/desktop/session/idle-delay、/org/gnome/desktop/screensaver/lock-enabled、/org/gnome/desktop/screensaver/lock-delay、/org/gnome/desktop/lockdown/disable-lock-screen",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "file": "/etc/dconf/db/local.d/locks/session",
+   "lines": [
+    "/org/gnome/desktop/session/idle-delay",
+    "/org/gnome/desktop/screensaver/lock-enabled",
+    "/org/gnome/desktop/screensaver/lock-delay",
+    "/org/gnome/desktop/lockdown/disable-lock-screen"
+   ]
+  },
+  "check": "/etc/dconf/db/local.d/locks/ 下的檔案（合併）需包含上列 4 個鎖定路徑；未安裝 GNOME 判不適用。",
+  "fix": "備份（或記錄新建）/etc/dconf/db/local.d/locks/session，補上缺少的路徑行，執行 dconf update。回滾：還原／刪除後 dconf update。",
+  "risk": "A",
+  "risk_reason": "只鎖定圖形桌面設定。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 GNOME／gdm（rpm -q gdm 或存在 /usr/bin/gnome-shell）；純伺服器未安裝時判不適用",
+  "existing": false,
+  "notes": "文件未要求 lock-delay 的值，只鎖定；若鎖定的鍵在資料庫中未設定值，會鎖定為系統預設值。文件未要求執行 dconf update，但不執行不會生效。"
+ },
+ {
+  "key": "root_gid_0",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0240",
+   "rhel9": "TWGCB-01-012-0238"
+  },
+  "category": "帳號與存取控制",
+  "title": "root 帳號所屬群組",
+  "expected": "GID 0",
+  "doc_method": "#usermod -g 0 root",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "user": "root",
+   "gid": 0
+  },
+  "check": "/etc/passwd 中 root 的第 4 欄（主要 GID）為 0。",
+  "fix": "備份 /etc/passwd 並記錄原 GID，執行 usermod -g 0 root。回滾：usermod -g <原 GID> root。",
+  "risk": "A",
+  "risk_reason": "預設即為 0，修改僅影響 root 之後新建檔案的群組。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "umask_profile",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0241",
+   "rhel9": "TWGCB-01-012-0239"
+  },
+  "category": "帳號與存取控制",
+  "title": "所有使用者帳號之預設 umask",
+  "expected": "027 或更低權限（umask 027）",
+  "doc_method": "編輯 /etc/profile、/etc/profile.d/ 下的 .sh 檔及 /etc/bashrc，新增或修改：umask 027",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "files": [
+    "/etc/profile",
+    "/etc/profile.d/*.sh",
+    "/etc/bashrc"
+   ],
+   "umask": "027",
+   "dropin": "/etc/profile.d/99-gcb-umask.sh"
+  },
+  "check": "搜尋 /etc/profile、/etc/profile.d/*.sh、/etc/bashrc 中未註解的 umask 指令：每一個 umask 值都需 (值 & 0o027) == 0o027（即至少與 027 一樣嚴格）；/etc/profile 與 /etc/bashrc 都需有符合的 umask。",
+  "fix": "備份 /etc/profile 與 /etc/bashrc，把原本依 UID 判斷的 umask 002/022 區塊中的 umask 值改為 027（保留 if 結構），並建立 /etc/profile.d/99-gcb-umask.sh（內容 umask 027）；profile.d 其他檔案中較寬鬆的 umask 備份後改為 027。回滾：還原備份、刪除 drop-in。",
+  "risk": "A",
+  "risk_reason": "只影響之後新建檔案的預設權限。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 的 /etc/profile 與 /etc/bashrc 內建「UID > 199 且群組名＝帳號名 → umask 002，否則 022」區塊，只附加一行可能被該區塊覆蓋，需直接修改區塊內的值。依賴群組共享寫入或其他人可讀的應用（網站內容目錄等）可能受影響。"
+ },
+ {
+  "key": "umask_login_defs",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0242",
+   "rhel9": "TWGCB-01-012-0240"
+  },
+  "category": "帳號與存取控制",
+  "title": "在 /etc/login.defs 設定所有使用者之預設 umask",
+  "expected": "027 或更低權限（UMASK 027）",
+  "doc_method": "編輯 /etc/login.defs：UMASK 027",
+  "version_diff": "",
+  "type": "login_defs",
+  "params": {
+   "key": "UMASK",
+   "value": "027",
+   "cmp": "umask_ge"
+  },
+  "check": "/etc/login.defs 中 UMASK 的最終值，以八進位比較 (值 & 0o027) == 0o027。",
+  "fix": "備份 /etc/login.defs，新增或修改「UMASK\t\t027」。回滾：還原備份。",
+  "risk": "A",
+  "risk_reason": "只影響 useradd 建立家目錄等預設權限。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 9 的 login.defs 另有 HOME_MODE（預設 0700），useradd 建立家目錄時優先使用 HOME_MODE。"
+ },
+ {
+  "key": "su_wheel_only",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0243",
+   "rhel9": "TWGCB-01-012-0241"
+  },
+  "category": "帳號與存取控制",
+  "title": "可使用 su 指令之群組",
+  "expected": "僅限 wheel 群組才能使用 su 指令",
+  "doc_method": "編輯 /etc/pam.d/su，新增或修改：auth required pam_wheel.so use_uid；編輯 /etc/group 的 wheel 群組，建立允許使用 su 的帳號清單，例如 wheel:x:10:root,user1,user2",
+  "version_diff": "",
+  "type": "pam",
+  "params": {
+   "pam_file": "/etc/pam.d/su",
+   "line": "auth required pam_wheel.so use_uid",
+   "group": "wheel"
+  },
+  "check": "/etc/pam.d/su 中有未註解的「auth required pam_wheel.so」行且帶 use_uid（若帶 group= 則依該群組）；另列出 wheel 群組成員供人工確認（不影響判定）。",
+  "fix": "前提：前測需確認至少一個非 root 管理帳號可使用 sudo（同 SshdOption 的 H04/H05 前測），否則略過。備份 /etc/pam.d/su；RHEL 預設已有註解的「#auth\t\trequired\tpam_wheel.so use_uid」，取消註解即可，否則在「auth sufficient pam_rootok.so」之後插入該行。不自動修改 wheel 成員（屬人工判斷）。回滾：還原 /etc/pam.d/su。",
+  "risk": "B",
+  "risk_reason": "非 wheel 成員將無法 su 成 root，可能影響依賴 su 的管理流程。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "/etc/pam.d/su 不由 authselect 管理，可直接修改。文件說明「預設任何使用者皆可執行 su」，實際仍需知道目標帳號通行碼。"
+ },
+ {
+  "key": "root_umask",
+  "ids": {
+   "rhel8": null,
+   "rhel9": "TWGCB-01-012-0309"
+  },
+  "category": "帳號與存取控制",
+  "title": "root 之預設 umask",
+  "expected": "027 或更低權限（umask 027）",
+  "doc_method": "編輯 /root/.bash_profile 與 /root/.bashrc，新增或修改：umask 027",
+  "version_diff": "僅 RHEL 9 文件有此項。",
+  "type": "custom",
+  "params": {
+   "files": [
+    "/root/.bash_profile",
+    "/root/.bashrc"
+   ],
+   "umask": "027"
+  },
+  "check": "/root/.bash_profile 與 /root/.bashrc 都需有未註解的 umask，且值 (值 & 0o027) == 0o027。",
+  "fix": "備份兩個檔案，若已有 umask 行則改為 027，否則附加於檔尾（/root/.bashrc 需放在 source /etc/bashrc 之後，避免被 /etc/bashrc 的 umask 022 覆蓋）。回滾：還原備份。",
+  "risk": "A",
+  "risk_reason": "只影響 root 之後新建檔案的權限。",
+  "needs_reboot": false,
+  "applies_when": "RHEL 9（RHEL 8 文件無此項，可選擇性套用）",
+  "existing": false,
+  "notes": "root 互動 shell 的有效 umask 取決於最後執行的 umask；/etc/bashrc 對 UID ≤ 199 設 umask 022，若 umask_profile 規則已改成 027 則不衝突。部分以 root 部署的程式產生的檔案會變成其他人不可讀，需注意。"
+ },
+ {
+  "key": "faillock_root_unlock_time",
+  "ids": {
+   "rhel8": null,
+   "rhel9": "TWGCB-01-012-0310"
+  },
+  "category": "帳號與存取控制",
+  "title": "root 帳戶鎖定時間",
+  "expected": "60 秒以上（even_deny_root、root_unlock_time=60）",
+  "doc_method": "編輯 /etc/security/faillock.conf，新增或修改：even_deny_root 與 root_unlock_time=60；解鎖：#faillock --user <使用者帳號名稱> --reset",
+  "version_diff": "僅 RHEL 9 文件有此項；RHEL 8.2+ 的 faillock.conf 同樣支援這兩個參數。",
+  "type": "pam",
+  "params": {
+   "conf": "/etc/security/faillock.conf",
+   "flags": [
+    "even_deny_root"
+   ],
+   "key": "root_unlock_time",
+   "cmp": "ge",
+   "value": 60,
+   "authselect_feature": "with-faillock"
+  },
+  "check": "/etc/security/faillock.conf 有未註解的 even_deny_root 旗標，且 root_unlock_time ≥ 60；並確認 pam_faillock 已啟用：/etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中有未註解的 auth … pam_faillock.so（preauth 與 authfail）與 account required pam_faillock.so 行（authselect current 會列出 with-faillock）；未啟用時設定檔不生效，判不合格。",
+  "fix": "前提：前測需確認有非 root 的 sudo 管理帳號可登入。備份 faillock.conf，加入 even_deny_root 與「root_unlock_time = 60」；pam_faillock 未啟用時沿用 Faillock 規則的 authselect enable-feature with-faillock 流程。回滾：還原 faillock.conf（必要時 disable-feature）。",
+  "risk": "B",
+  "risk_reason": "root 連續失敗後會被鎖定，暴力攻擊或錯誤腳本可能讓 root 暫時無法登入（含主控台）。",
+  "needs_reboot": false,
+  "applies_when": "RHEL 9（RHEL 8.2+ 可選擇性套用）",
+  "existing": false,
+  "notes": "文件把兩個參數寫在同一行「even_deny_root root_unlock_time=60」，實際應分兩行。未設 root_unlock_time 時 root 沿用 unlock_time。"
+ },
+ {
+  "key": "pwquality_maxsequence",
+  "ids": {
+   "rhel8": null,
+   "rhel9": "TWGCB-01-012-0311"
+  },
+  "category": "帳號與存取控制",
+  "title": "連續字元序列可使用個數",
+  "expected": "3 以下，但須大於 0（maxsequence=3）",
+  "doc_method": "編輯 /etc/security/pwquality.conf，新增或修改：maxsequence=3",
+  "version_diff": "僅 RHEL 9 文件有此項；RHEL 8 的 libpwquality 同樣支援 maxsequence。",
+  "type": "kv_config",
+  "params": {
+   "path": "/etc/security/pwquality.conf",
+   "dropin_glob": "/etc/security/pwquality.conf.d/*.conf",
+   "key": "maxsequence",
+   "value": "3",
+   "cmp": "range",
+   "sep": " = ",
+   "pam_override_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "依序讀取 /etc/security/pwquality.conf 與 /etc/security/pwquality.conf.d/*.conf（依檔名排序，後讀者覆寫前者），忽略 # 註解，取 maxsequence 的最終有效值，需 1 ≤ 值 ≤ 3（0 代表停用檢查，不合格）；另檢查 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中未註解的 pam_pwquality.so 行，若帶有 maxsequence= 參數（模組參數會覆寫設定檔）也必須符合；並確認 pam_pwquality.so 確實存在於 password 堆疊（否則設定不生效，判不合格並提示 012-0313）。",
+  "fix": "備份後在 /etc/security/pwquality.conf 新增或修改「maxsequence = 3」（與既有 PassMinLen 規則一致，寫主檔；鍵比對不分大小寫、取代既有未註解行，無則附加於檔尾）；pwquality.conf.d/ 內若有不合格的 maxsequence 行，備份該檔後註解掉。PAM 行上的 maxsequence= 覆寫參數不自動修改（屬 authselect 管理範圍），標記 partial 並提示人工處理。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "只修改 pwquality 設定檔，不動 PAM 堆疊，只影響之後變更通行碼時的強度檢查。",
+  "needs_reboot": false,
+  "applies_when": "RHEL 9（RHEL 8 可選擇性套用）",
+  "existing": false,
+  "notes": "maxsequence 限制如 abcd、1234 等單調序列長度。"
+ },
+ {
+  "key": "authselect_without_nullok",
+  "ids": {
+   "rhel8": null,
+   "rhel9": "TWGCB-01-012-0312"
+  },
+  "category": "帳號與存取控制",
+  "title": "啟用 without-nullok",
+  "expected": "啟用",
+  "doc_method": "#authselect enable-feature without-nullok",
+  "version_diff": "僅 RHEL 9 文件列為獨立項目；RHEL 8 文件在多條規則的 authselect select 指令中帶有 without-nullok，但未單獨列項。",
+  "type": "authselect_feature",
+  "params": {
+   "feature": "without-nullok",
+   "pam_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ]
+  },
+  "check": "authselect current 的 features 含 without-nullok，且 /etc/pam.d/system-auth 與 /etc/pam.d/password-auth 中所有未註解的 pam_unix.so 行都不含 nullok。系統未使用 authselect 時只看 PAM 檔案內容。",
+  "fix": "前提：先確認沒有空白通行碼的帳號（0072 EmptyPassword 合格），否則略過並提示。系統使用 authselect：備份 /etc/authselect/*，登記回滾指令 authselect disable-feature without-nullok，執行 authselect enable-feature without-nullok。未使用 authselect → ManualRequired。",
+  "risk": "B",
+  "risk_reason": "修改 PAM 認證堆疊，空白通行碼的帳號將無法登入。",
+  "needs_reboot": false,
+  "applies_when": "RHEL 9（RHEL 8 可選擇性套用）",
+  "existing": false,
+  "notes": "authselect 若偵測到 PAM 曾被手改會拒絕執行（需 --force），此時應轉人工，不可加 --force。"
+ },
+ {
+  "key": "pam_pwquality_enabled",
+  "ids": {
+   "rhel8": null,
+   "rhel9": "TWGCB-01-012-0313"
+  },
+  "category": "帳號與存取控制",
+  "title": "啟用 pam_pwquality",
+  "expected": "啟用",
+  "doc_method": "#grep -P -- '\\bpam_pwquality\\.so\\b' /etc/pam.d/{password,system}-auth；若無輸出，在 /etc/pam.d/password-auth 與 /etc/pam.d/system-auth 新增：password requisite pam_pwquality.so local_users_only",
+  "version_diff": "僅 RHEL 9 文件有此項。",
+  "type": "pam",
+  "params": {
+   "pam_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ],
+   "module": "pam_pwquality.so"
+  },
+  "check": "system-auth 與 password-auth 都有未註解的 password … pam_pwquality.so 行。",
+  "fix": "authselect 內建的 sssd/minimal/winbind 等 profile 都已包含 pam_pwquality；不合格表示 PAM 被手改或使用自訂 profile，不直接修改 /etc/pam.d（會被 authselect 覆寫，且寫錯會鎖死登入），一律 ManualRequired，提示執行 authselect check 並依目前 profile 修正。",
+  "risk": "C",
+  "risk_reason": "（實作改為 C 類，原分析為 B 類，以程式為準）需修改 PAM 堆疊，寫錯可能導致無法登入或無法變更通行碼。",
+  "needs_reboot": false,
+  "applies_when": "RHEL 9（RHEL 8 可作為 pwquality 系列規則的前提檢查）",
+  "existing": false,
+  "notes": "文件做法是直接編輯 /etc/pam.d/*-auth，在 authselect 管理的系統上會被下次 apply-changes 覆寫，不建議照做。"
+ },
+ {
+  "key": "pam_unix_enabled",
+  "ids": {
+   "rhel8": null,
+   "rhel9": "TWGCB-01-012-0314"
+  },
+  "category": "帳號與存取控制",
+  "title": "啟用 pam_unix",
+  "expected": "啟用",
+  "doc_method": "#grep -P -- '\\bpam_unix\\.so\\b' /etc/pam.d/{password,system}-auth；若無輸出，在 password-auth 與 system-auth 新增：auth sufficient pam_unix.so、account required pam_unix.so、password sufficient pam_unix.so sha512 shadow use_authtok、session required pam_unix.so",
+  "version_diff": "僅 RHEL 9 文件有此項。",
+  "type": "pam",
+  "params": {
+   "pam_files": [
+    "/etc/pam.d/system-auth",
+    "/etc/pam.d/password-auth"
+   ],
+   "module": "pam_unix.so",
+   "types": [
+    "auth",
+    "account",
+    "password",
+    "session"
+   ]
+  },
+  "check": "system-auth 與 password-auth 中，auth、account、password、session 四種類型都各有未註解的 pam_unix.so 行。",
+  "fix": "同 pam_pwquality_enabled：不直接修改 PAM，不合格時 ManualRequired，提示 authselect check／authselect select <profile> --force 需人工評估。",
+  "risk": "C",
+  "risk_reason": "（實作改為 C 類，原分析為 B 類，以程式為準）缺少 pam_unix 代表 PAM 堆疊已被大幅改動，自動修補可能鎖死所有登入。",
+  "needs_reboot": false,
+  "applies_when": "RHEL 9（RHEL 8 可作為前提檢查）",
+  "existing": false,
+  "notes": "若系統完全改用 SSSD/LDAP 等外部認證，pam_unix 仍應存在以處理本機帳號（authselect 預設如此）。"
+ }
+]

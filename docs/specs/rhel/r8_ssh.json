@@ -1,0 +1,917 @@
+[
+ {
+  "key": "sshd_service_enabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0262",
+   "rhel9": "TWGCB-01-012-0254"
+  },
+  "category": "SSH 設定",
+  "title": "sshd 守護程序",
+  "expected": "啟用",
+  "doc_method": "`dnf install openssh-server.x86_64` 安裝套件，再 `systemctl --now enable sshd.service` 啟用並啟動。",
+  "version_diff": "",
+  "type": "service_enabled",
+  "params": {
+   "unit": "sshd.service",
+   "pkg": "openssh-server"
+  },
+  "check": "`rpm -q openssh-server` 已安裝，且 `systemctl is-enabled sshd.service` 為 enabled、`systemctl is-active sshd.service` 為 active。",
+  "fix": "若未安裝：`dnf -y install openssh-server`（記錄為新安裝，回滾時 `dnf -y remove openssh-server`）；記錄原 enabled/active 狀態後 `systemctl enable --now sshd.service`，回滾時依原狀態 disable/stop。",
+  "risk": "B",
+  "risk_reason": "會新增對外監聽的 22/tcp 服務並可能需要安裝套件（需套件庫可用）。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "文件寫死 `openssh-server.x86_64`，在 aarch64 等架構應改用 `openssh-server` 不帶架構。工具多半就是透過 SSH 執行，此項在一般伺服器上預設即合格。若 sshd 未安裝，本分組其他 sshd_option 項目應列為不適用，而非自動安裝後再修改。"
+ },
+ {
+  "key": "sshd_protocol",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0263",
+   "rhel9": "TWGCB-01-012-0255"
+  },
+  "category": "SSH 設定",
+  "title": "SSH 協定版本",
+  "expected": "Protocol 2",
+  "doc_method": "編輯 /etc/ssh/sshd_config，新增或修改 `Protocol 2`，再 `systemctl restart sshd`。",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "desc": "OpenSSH 7.4 起已移除 SSH-1，Protocol 為過時參數，`sshd -T` 不會輸出。以 OpenSSH 版本判定。"
+  },
+  "check": "以 `sshd -V`（或 `rpm -q --qf '%{VERSION}' openssh-server`）取得版本，>= 7.4 即只支援 SSH-2，判定合格（RHEL 8 為 8.0p1、RHEL 9 為 8.7p1，必定合格）；可附帶顯示主檔是否有 `Protocol 2` 字樣，但不作為判定依據。",
+  "fix": "不需修改。若單位稽核要求設定檔中必須出現此行，可在主檔全域區段寫入 `Protocol 2`（sshd 只記錄「Deprecated option」警告，`sshd -t` 仍可通過），寫入前備份，回滾時還原。",
+  "risk": "A",
+  "risk_reason": "OpenSSH 8.x 本身就只支援 SSH-2，通常不需修改。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "Protocol 在 OpenSSH 7.4 起已被忽略，`sshd -T` 不會輸出 protocol，若用 sshd_option 檢查 `sshd -T` 會永遠判定未設定而誤報不合格，所以改用版本判定。寫入 `Protocol 2` 不影響連線，但會在日誌產生 deprecated 警告。"
+ },
+ {
+  "key": "sshd_config_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0264",
+   "rhel9": "TWGCB-01-012-0256"
+  },
+  "category": "SSH 設定",
+  "title": "/etc/ssh/sshd_config 檔案所有權",
+  "expected": "root:root",
+  "doc_method": "`chown root:root /etc/ssh/sshd_config`",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/ssh/sshd_config"
+   ],
+   "owner": "root",
+   "groups": [
+    "root"
+   ],
+   "max_mode": null,
+   "recursive": false
+  },
+  "check": "`stat -c '%U:%G' /etc/ssh/sshd_config` 為 root:root。",
+  "fix": "記錄原擁有者後 `chown root:root /etc/ssh/sshd_config`；回滾時還原原擁有者與群組。",
+  "risk": "A",
+  "risk_reason": "sshd 以 root 讀取設定檔，變更擁有者不影響服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 預設即為 root:root。建議同時檢查 /etc/ssh/sshd_config.d/*.conf（RHEL 9 的 50-redhat.conf 等），文件未要求但一樣是生效的設定。"
+ },
+ {
+  "key": "sshd_config_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0265",
+   "rhel9": "TWGCB-01-012-0257"
+  },
+  "category": "SSH 設定",
+  "title": "/etc/ssh/sshd_config 檔案權限",
+  "expected": "600 或更低權限",
+  "doc_method": "`chmod 600 /etc/ssh/sshd_config`",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths": [
+    "/etc/ssh/sshd_config"
+   ],
+   "owner": null,
+   "groups": null,
+   "max_mode": "0600",
+   "recursive": false
+  },
+  "check": "`stat -c '%a' /etc/ssh/sshd_config` 的權限位元不得超出 0600（即 mode & ~0600 == 0）。",
+  "fix": "記錄原權限後 `chmod u-x,go-rwx /etc/ssh/sshd_config`（只移除多出的權限）；回滾時還原原權限。",
+  "risk": "A",
+  "risk_reason": "sshd 以 root 讀取設定檔，收緊權限不影響服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 8/9 預設即為 0600。drop-in 目錄內檔案（RHEL 9 預設 0600）文件未要求，可視需要一併檢查。"
+ },
+ {
+  "key": "sshd_access_limit",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0266",
+   "rhel9": "TWGCB-01-012-0258"
+  },
+  "category": "SSH 設定",
+  "title": "限制存取 SSH",
+  "expected": "啟用",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `AllowUsers <使用者清單>`、`AllowGroups <群組清單>`、`DenyUsers <使用者清單>`、`DenyGroups <群組清單>` 其中一種以上（範例：`AllowUsers smith jones`），再 `systemctl restart sshd`。",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "desc": "檢查 sshd -T 的 allowusers/allowgroups/denyusers/denygroups 至少一項有值；值需由使用者提供，不自動修復。",
+   "options": [
+    "AllowUsers",
+    "AllowGroups",
+    "DenyUsers",
+    "DenyGroups"
+   ]
+  },
+  "check": "`sshd -T` 輸出中 allowusers、allowgroups、denyusers、denygroups 任一關鍵字存在且有值即合格（未設定時 `sshd -T` 不會輸出這幾項）；報告中列出目前的值。",
+  "fix": "不自動修復，列為人工處理。若要提供半自動選項：從 config.ini 讀取管理者指定的清單（例如 [ssh] allow_groups=wheel sshusers），修復前確認目前執行工具的登入帳號（SUDO_USER / `who am i`）與健康檢查用的一般帳號符合該清單，否則拒絕套用；接著沿用 SshdOption 流程（備份、寫主檔全域區段、`sshd -t`、reload），回滾還原備份。",
+  "risk": "C",
+  "risk_reason": "允許清單需由單位提供，設錯會使所有未列入的帳號（含管理者）無法 SSH 登入。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "【鎖定風險】AllowUsers/AllowGroups 一旦設定，未列入者全部拒絕；AllowUsers 與 AllowGroups 同時設定時必須兩者都符合才可登入。務必包含維運帳號與工具前測的一般帳號，並保留一個已開啟的 SSH 連線測試新連線後再關閉。文件中 DenyGroups 寫成「(使用者清單)」應為群組清單。只設定 Deny* 是否算「啟用」文件未明確，建議以 Allow* 為主，Deny* 也接受。AllowUsers 支援 user@host 形式。"
+ },
+ {
+  "key": "sshd_hostkey_private_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0267",
+   "rhel9": "TWGCB-01-012-0259"
+  },
+  "category": "SSH 設定",
+  "title": "SSH 主機私鑰檔案所有權",
+  "expected": {
+   "rhel8": "root:root",
+   "rhel9": "root:ssh_keys"
+  },
+  "doc_method": "RHEL 8：`find /etc/ssh -xdev -type f -name 'ssh_host_*_key' -exec chown root:root {} \\;`；RHEL 9：`find /etc/ssh -xdev -type f -name 'ssh_host_*_key' -exec chown root:ssh_keys {} \\;`",
+  "version_diff": "RHEL 8 要求 root:root；RHEL 9 要求 root:ssh_keys。",
+  "type": "file_perm",
+  "params": {
+   "paths_cmd": "find /etc/ssh -xdev -type f -name 'ssh_host_*_key'",
+   "owner": "root",
+   "groups": {
+    "rhel8": [
+     "root"
+    ],
+    "rhel9": [
+     "ssh_keys",
+     "root"
+    ]
+   },
+   "max_mode": null,
+   "recursive": false
+  },
+  "check": "以 `find /etc/ssh -xdev -type f -name 'ssh_host_*_key'` 列出私鑰，逐一 `stat -c '%U:%G'`：擁有者須為 root；群組 RHEL 8 須為 root，RHEL 9 須為 ssh_keys（建議也接受 root，見 notes）。找不到私鑰時視為不適用。",
+  "fix": "記錄每個檔案原擁有者/群組後 chown 為規定值（RHEL 8 root:root；RHEL 9 root:ssh_keys，若 ssh_keys 群組不存在則改 root:root 並註記）；回滾逐檔還原。",
+  "risk": "A",
+  "risk_reason": "sshd 以 root 讀取主機私鑰，變更群組不影響連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 8 預設主機私鑰為 root:ssh_keys 0640，因此 RHEL 8 依文件會判定不合格並改為 root:root；只有 hostbased 驗證用的 ssh-keysign（setgid ssh_keys）需要 ssh_keys 群組，而 0276 已停用 hostbased，改為 root:root 無影響。RHEL 9 較新的 openssh 版本可能以 root:root 0600 產生主機金鑰，root 群組比 ssh_keys 更嚴格，建議視為合格（工具需決定是否嚴格比對文件值）。"
+ },
+ {
+  "key": "sshd_hostkey_private_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0268",
+   "rhel9": "TWGCB-01-012-0260"
+  },
+  "category": "SSH 設定",
+  "title": "SSH 主機私鑰檔案權限",
+  "expected": {
+   "rhel8": "600 或更低權限",
+   "rhel9": "640 或更低權限"
+  },
+  "doc_method": "RHEL 8：`find /etc/ssh -xdev -type f -name 'ssh_host_*_key' -exec chmod 600 {} \\;`；RHEL 9：`find /etc/ssh -xdev -type f -name 'ssh_host_*_key' -exec chmod 640 {} \\;`",
+  "version_diff": "RHEL 8 為 600 或更低；RHEL 9 為 640 或更低（RHEL 9 文件說明寫 600、指令與 GCB 設定值寫 640）。",
+  "type": "file_perm",
+  "params": {
+   "paths_cmd": "find /etc/ssh -xdev -type f -name 'ssh_host_*_key'",
+   "owner": null,
+   "groups": null,
+   "max_mode": {
+    "rhel8": "0600",
+    "rhel9": "0640"
+   },
+   "recursive": false
+  },
+  "check": "以 `find /etc/ssh -xdev -type f -name 'ssh_host_*_key'` 列出私鑰，`stat -c '%a'` 的權限位元不得超出規定值（RHEL 8 0600、RHEL 9 0640）。",
+  "fix": "記錄原權限後只移除超出的位元（RHEL 8 `chmod u-x,go-rwx`；RHEL 9 `chmod u-x,g-wx,o-rwx`）；回滾逐檔還原。",
+  "risk": "A",
+  "risk_reason": "收緊權限不影響 sshd（sshd 反而會拒絕權限過寬的私鑰）。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 9 文件內文說「600 或更低」但指令與 GCB 設定值為 640，以 GCB 設定值 640 為準。不要用文件的 `chmod 600/640` 直接覆寫，避免把 0600 的檔案放寬成 0640。"
+ },
+ {
+  "key": "sshd_hostkey_public_owner",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0269",
+   "rhel9": "TWGCB-01-012-0261"
+  },
+  "category": "SSH 設定",
+  "title": "SSH 主機公鑰檔案所有權",
+  "expected": "root:root",
+  "doc_method": "`find /etc/ssh -xdev -type f -name 'ssh_host_*_key.pub' -exec chown root:root {} \\;`",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths_cmd": "find /etc/ssh -xdev -type f -name 'ssh_host_*_key.pub'",
+   "owner": "root",
+   "groups": [
+    "root"
+   ],
+   "max_mode": null,
+   "recursive": false
+  },
+  "check": "以 `find /etc/ssh -xdev -type f -name 'ssh_host_*_key.pub'` 列出公鑰，逐一確認 `stat -c '%U:%G'` 為 root:root。",
+  "fix": "記錄原擁有者後 `chown root:root`；回滾逐檔還原。",
+  "risk": "A",
+  "risk_reason": "公鑰檔所有權變更不影響 sshd 運作。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 8/9 預設即為 root:root。"
+ },
+ {
+  "key": "sshd_hostkey_public_perm",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0270",
+   "rhel9": "TWGCB-01-012-0262"
+  },
+  "category": "SSH 設定",
+  "title": "SSH 主機公鑰檔案權限",
+  "expected": "644 或更低權限",
+  "doc_method": "`find /etc/ssh -xdev -type f -name 'ssh_host_*_key.pub' -exec chmod 644 {} \\;`",
+  "version_diff": "",
+  "type": "file_perm",
+  "params": {
+   "paths_cmd": "find /etc/ssh -xdev -type f -name 'ssh_host_*_key.pub'",
+   "owner": null,
+   "groups": null,
+   "max_mode": "0644",
+   "recursive": false
+  },
+  "check": "以 `find /etc/ssh -xdev -type f -name 'ssh_host_*_key.pub'` 列出公鑰，`stat -c '%a'` 的權限位元不得超出 0644。",
+  "fix": "記錄原權限後 `chmod u-x,go-wx`（只移除超出位元）；回滾逐檔還原。",
+  "risk": "A",
+  "risk_reason": "公鑰本就公開，收緊寫入權限不影響服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 8/9 預設即為 0644。"
+ },
+ {
+  "key": "sshd_crypto_algorithms",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0271",
+   "rhel9": "TWGCB-01-012-0263"
+  },
+  "category": "SSH 設定",
+  "title": "SSH 加密演算法",
+  "expected": "aes128-ctr,aes192-ctr,aes256-ctr",
+  "doc_method": "編輯 /etc/crypto-policies/back-ends/opensshserver.config，新增或修改為：`-oCiphers aes128-ctr,aes192-ctr,aes256-ctr -oMACS=hmac-sha2-512,hmac-sha2-256 -oKexAlgorithms=ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512`，再 `systemctl restart sshd`。",
+  "version_diff": "兩版文件內容相同，但後端檔格式不同：RHEL 8 的 opensshserver.config 是 systemd EnvironmentFile，內容為 `CRYPTO_POLICY='-oCiphers=... -oMACs=... -oKexAlgorithms=...'`，由 sshd.service 以 `sshd -D $OPTIONS $CRYPTO_POLICY` 帶入命令列；RHEL 9 的 opensshserver.config 是 sshd_config 語法（`Ciphers ...` 等），由 /etc/ssh/sshd_config.d/50-redhat.conf 以 Include 載入。文件的 `-o...` 寫法只接近 RHEL 8 格式，照抄到 RHEL 9 會造成 sshd 語法錯誤而無法啟動。",
+  "type": "custom",
+  "params": {
+   "ciphers": [
+    "aes128-ctr",
+    "aes192-ctr",
+    "aes256-ctr"
+   ],
+   "macs": [
+    "hmac-sha2-512",
+    "hmac-sha2-256"
+   ],
+   "kexalgorithms": [
+    "ecdh-sha2-nistp256",
+    "ecdh-sha2-nistp384",
+    "ecdh-sha2-nistp521",
+    "diffie-hellman-group-exchange-sha256",
+    "diffie-hellman-group14-sha256",
+    "diffie-hellman-group16-sha512",
+    "diffie-hellman-group18-sha512"
+   ],
+   "compare": "subset",
+   "desc": "實際生效的 Ciphers/MACs/KexAlgorithms 須為允許清單的子集合；以 crypto-policies 自訂子原則修復。"
+  },
+  "check": "取得 sshd 實際生效值後，ciphers、macs、kexalgorithms 每一項的逗號分隔清單都須為允許清單的子集合（不要求順序或完全相同）。RHEL 9：直接 `sshd -T`（已含 50-redhat.conf Include 的 crypto policy 後端）。RHEL 8：`sshd -T` 單獨執行不會帶入 systemd 傳給 sshd 的 $CRYPTO_POLICY 命令列參數，必須模擬服務啟動環境，例如 `bash -c 'set -a; . /etc/crypto-policies/back-ends/opensshserver.config; [ -f /etc/sysconfig/sshd ] && . /etc/sysconfig/sshd; exec /usr/sbin/sshd -T $OPTIONS $CRYPTO_POLICY'`（環境檔順序依 `systemctl cat sshd` 的 EnvironmentFile 為準）。",
+  "fix": "建議以 crypto-policies 子原則（RHEL 8.2 以上、RHEL 9 皆支援）只限縮 SSH 範圍，同時符合 0292/0284「不覆寫全系統加密原則」：1) 備份 /etc/crypto-policies/config 並記錄 `update-crypto-policies --show` 目前值（例如 DEFAULT）；2) 寫入 /etc/crypto-policies/policies/modules/GCB-SSH.pmod，內容如 `cipher@SSH = AES-256-CTR AES-192-CTR AES-128-CTR`、`mac@SSH = HMAC-SHA2-512 HMAC-SHA2-256`、`key_exchange@SSH = ECDHE DHE`、`hash@SSH = -SHA1`，並視版本支援加上 `etm@SSH = DISABLE_ETM`（排除 *-etm@openssh.com MAC）；3) `update-crypto-policies --set <原原則>:GCB-SSH`；4) 以上述 check 模擬方式先驗證結果為允許清單子集合且 `sshd -t` 通過，不符則立刻回復原原則；5) RHEL 8 必須 `systemctl restart sshd`（reload 會以原命令列重新執行，不會讀到新的 CRYPTO_POLICY）；RHEL 9 `systemctl reload sshd` 即可。回滾：`update-crypto-policies --set <原原則>`、刪除 GCB-SSH.pmod、restart sshd。RHEL 9 的替代作法：新增 /etc/ssh/sshd_config.d/40-gcb-crypto.conf（排序在 50-redhat.conf 之前，sshd 取第一個值）寫入 Ciphers/MACs/KexAlgorithms；但這屬於在 sshd 層覆寫 crypto policy，與 0284 精神衝突，僅作為無法使用子原則時的備案。不要直接修改 /etc/crypto-policies/back-ends/ 下的檔案（為符號連結，執行 update-crypto-policies 時會被覆寫）。",
+  "risk": "B",
+  "risk_reason": "限縮演算法後，不支援 CTR/HMAC-SHA2/ECDH 的舊用戶端或設備將無法連線，設錯會使 sshd 無法啟動。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "【鎖定風險】GCB 清單排除 chacha20-poly1305、aes-gcm、curve25519 與 *-etm MAC，現代 OpenSSH/PuTTY 用戶端仍可協商，但部分網路設備、舊版 Java/Paramiko 程式庫可能無法連線，套用前保留現有連線並以新連線測試。文件問題：`-oCiphers aes128-ctr...` 少了「=」、`-oMACS` 大小寫不一致（OpenSSH 關鍵字不分大小寫，可接受），且缺少 RHEL 8 必要的 `CRYPTO_POLICY='...'` 外框；直接編輯 back-ends 檔會在下次 update-crypto-policies 或套件更新時被還原。GCB 設定值欄只列 Ciphers，但修改方法同時規範 MACs 與 KexAlgorithms，建議三者都檢查。crypto-policies 子原則實際產生的清單依版本而異（例如是否支援 etm 選項、DHE 會不會帶出 group-exchange-sha1），務必以 check 結果驗證，不符時改用 RHEL 9 drop-in 備案或列為人工處理。FIPS 模式下 CTR 與 HMAC-SHA2 仍可用。Rocky/Alma 的 crypto-policies 與 RHEL 相同。"
+ },
+ {
+  "key": "sshd_loglevel",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0272",
+   "rhel9": "TWGCB-01-012-0264"
+  },
+  "category": "SSH 設定",
+  "title": "SSH 日誌記錄等級",
+  "expected": "VERBOSE 或 INFO",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `LogLevel VERBOSE`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "LogLevel",
+   "value": [
+    "VERBOSE",
+    "INFO"
+   ],
+   "compare": "in"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `loglevel` 的值須為 INFO 或 VERBOSE（不分大小寫）。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `LogLevel VERBOSE`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "只改變日誌詳細程度，但仍需 reload sshd。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 預設 INFO 即合格；不合格時修復寫入 VERBOSE（可記錄登入金鑰指紋）。DEBUG 等級會記錄過多資訊，不合格。"
+ },
+ {
+  "key": "sshd_x11forwarding",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0273",
+   "rhel9": "TWGCB-01-012-0265"
+  },
+  "category": "SSH 設定",
+  "title": "SSH X11Forwarding 功能",
+  "expected": "no",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `X11Forwarding no`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "X11Forwarding",
+   "value": "no",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `x11forwarding` 的值須為 no。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `X11Forwarding no`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 8 主檔預設 `X11Forwarding yes`；RHEL 9 寫在 /etc/ssh/sshd_config.d/50-redhat.conf，且該檔先於主檔生效，必須註解 drop-in 內的設定（既有 SshdOption 流程已處理）。50-redhat.conf 屬 openssh-server 套件設定檔，套件更新時會產生 .rpmnew 而不覆寫。會使需要遠端圖形介面的維運方式失效。"
+ },
+ {
+  "key": "sshd_maxauthtries",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0274",
+   "rhel9": "TWGCB-01-012-0266"
+  },
+  "category": "SSH 設定",
+  "title": "SSH MaxAuthTries 參數",
+  "expected": "4 以下，但須大於 0",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `MaxAuthTries 4`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "MaxAuthTries",
+   "value": [
+    1,
+    4
+   ],
+   "compare": "range"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `maxauthtries` 的值須為 1 至 4 的整數。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `MaxAuthTries 4`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "【鎖定風險】預設 6。降為 4 後，ssh-agent 載入多把金鑰的用戶端可能在嘗試到正確金鑰前就出現「Too many authentication failures」被斷線，需在用戶端使用 IdentitiesOnly/IdentityFile 指定金鑰。修復前請確認維運帳號能以單一金鑰或密碼登入。"
+ },
+ {
+  "key": "sshd_ignorerhosts",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0275",
+   "rhel9": "TWGCB-01-012-0267"
+  },
+  "category": "SSH 設定",
+  "title": "SSH IgnoreRhosts 參數",
+  "expected": "yes",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `IgnoreRhosts yes`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "IgnoreRhosts",
+   "value": "yes",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `ignorerhosts` 的值須為 yes。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `IgnoreRhosts yes`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "OpenSSH 預設 yes，通常合格。文件提到的 RhostsRSAAuthentication 為 SSH-1 參數，已不存在。"
+ },
+ {
+  "key": "sshd_hostbasedauthentication",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0276",
+   "rhel9": "TWGCB-01-012-0268"
+  },
+  "category": "SSH 設定",
+  "title": "SSH HostbasedAuthentication 參數",
+  "expected": "no",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `HostbasedAuthentication no`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "HostbasedAuthentication",
+   "value": "no",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `hostbasedauthentication` 的值須為 no。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `HostbasedAuthentication no`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "OpenSSH 預設 no，通常合格。"
+ },
+ {
+  "key": "sshd_permitrootlogin",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0277",
+   "rhel9": "TWGCB-01-012-0269"
+  },
+  "category": "SSH 設定",
+  "title": "SSH PermitRootLogin 參數",
+  "expected": "no",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `PermitRootLogin no`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "預設值不同：RHEL 8 主檔明確設定 `PermitRootLogin yes`；RHEL 9 編譯預設為 prohibit-password，但安裝時若勾選「允許 root 以密碼 SSH 登入」，Anaconda 會建立 /etc/ssh/sshd_config.d/01-permitrootlogin.conf 寫入 `PermitRootLogin yes`。",
+  "type": "sshd_option",
+  "params": {
+   "option": "PermitRootLogin",
+   "value": "no",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `permitrootlogin` 的值須為 no（prohibit-password / without-password / forced-commands-only 都不合格）。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `PermitRootLogin no`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": true,
+  "notes": "【鎖定風險】若唯一的遠端管理方式是 root 登入，修復後將無法再以 root 連線。既有實作已有前置條件：前測須確認一般帳號可 SSH 登入（H04）且可使用 sudo（H05），否則略過。RHEL 9 的 01-permitrootlogin.conf 會先於主檔生效，必須註解（既有流程已處理）。"
+ },
+ {
+  "key": "sshd_permitemptypasswords",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0278",
+   "rhel9": "TWGCB-01-012-0270"
+  },
+  "category": "SSH 設定",
+  "title": "SSH PermitEmptyPasswords 參數",
+  "expected": "no",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `PermitEmptyPasswords no`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "PermitEmptyPasswords",
+   "value": "no",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `permitemptypasswords` 的值須為 no。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `PermitEmptyPasswords no`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "OpenSSH 預設 no，通常合格。"
+ },
+ {
+  "key": "sshd_permituserenvironment",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0279",
+   "rhel9": "TWGCB-01-012-0271"
+  },
+  "category": "SSH 設定",
+  "title": "SSH PermitUserEnvironment 參數",
+  "expected": "no",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `PermitUserEnvironment no`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "PermitUserEnvironment",
+   "value": "no",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `permituserenvironment` 的值須為 no。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `PermitUserEnvironment no`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "OpenSSH 預設 no，通常合格。"
+ },
+ {
+  "key": "sshd_clientalive",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0280",
+   "rhel9": "TWGCB-01-012-0272"
+  },
+  "category": "SSH 設定",
+  "title": "SSH 逾時時間",
+  "expected": "ClientAliveInterval 設為 600 以下，但須大於 0，且 ClientAliveCountMax 設為 1",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `ClientAliveInterval 600` 與 `ClientAliveCountMax 1`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "options": [
+    {
+     "option": "ClientAliveInterval",
+     "value": [
+      1,
+      600
+     ],
+     "compare": "range"
+    },
+    {
+     "option": "ClientAliveCountMax",
+     "value": "1",
+     "compare": "eq"
+    }
+   ]
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `clientaliveinterval 與 clientalivecountmax` 的值，interval 須為 1 至 600 的整數（秒），countmax 須等於 1。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `ClientAliveInterval 600` 與 `ClientAliveCountMax 1`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。 兩個參數在同一次修復中寫入，僅執行一次 `sshd -t` 與 reload；只修正不合格的那一項（例如已設 300 則保留）。",
+  "risk": "B",
+  "risk_reason": "sshd 設定錯誤可能導致 sshd 無法啟動或切斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "預設 interval 0（停用）、countmax 3，預設不合格。ClientAlive 是對用戶端送 keepalive，用戶端仍在線就會回應，因此不會中斷「閒置但連線正常」的工作階段，主要用於清除斷線殘留連線；若需閒置登出應搭配 shell 的 TMOUT 規則。sshd -T 顯示的單位為秒（設定 10m 會顯示 600）。"
+ },
+ {
+  "key": "sshd_logingracetime",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0281",
+   "rhel9": "TWGCB-01-012-0273"
+  },
+  "category": "SSH 設定",
+  "title": "SSH LoginGraceTime 參數",
+  "expected": "60 以下，但須大於 0",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `LoginGraceTime 60`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "LoginGraceTime",
+   "value": [
+    1,
+    60
+   ],
+   "compare": "range"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `logingracetime` 的值須為 1 至 60 的整數（秒；sshd -T 會把 1m 等時間格式換算為秒）。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `LoginGraceTime 60`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "預設 120，預設不合格。0 代表無限制，不合格。"
+ },
+ {
+  "key": "sshd_usepam",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0282",
+   "rhel9": "TWGCB-01-012-0274"
+  },
+  "category": "SSH 設定",
+  "title": "SSH UsePAM 參數",
+  "expected": "yes",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `UsePAM yes`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "UsePAM",
+   "value": "yes",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `usepam` 的值須為 yes。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `UsePAM yes`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 8 主檔、RHEL 9 50-redhat.conf 預設 `UsePAM yes`，通常合格。RHEL 上若改成 no 會使密碼登入與 faillock 等 PAM 規則失效。"
+ },
+ {
+  "key": "sshd_allowtcpforwarding",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0283",
+   "rhel9": "TWGCB-01-012-0275"
+  },
+  "category": "SSH 設定",
+  "title": "SSH AllowTcpForwarding 參數",
+  "expected": "no",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `AllowTcpForwarding no`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "AllowTcpForwarding",
+   "value": "no",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `allowtcpforwarding` 的值須為 no。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `AllowTcpForwarding no`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "預設 yes，預設不合格。停用後 SSH 通道（ssh -L/-R/-D）、VS Code Remote-SSH、部分資料庫管理工具的 SSH tunnel 會失效，修復前應告知維運人員。"
+ },
+ {
+  "key": "sshd_maxstartups",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0284",
+   "rhel9": "TWGCB-01-012-0276"
+  },
+  "category": "SSH 設定",
+  "title": "SSH MaxStartups 參數",
+  "expected": "10:30:60",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `MaxStartups 10:30:60`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "MaxStartups",
+   "value": "10:30:60",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `maxstartups` 的值須等於 10:30:60。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `MaxStartups 10:30:60`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "預設 10:30:100，預設不合格。文件設定行寫小寫 `maxstartups`，sshd 關鍵字不分大小寫，寫入時用標準寫法 MaxStartups。若單位設定更嚴格的值（例如 10:30:50）是否接受，文件未說明；建議允許各欄位都不大於 10:30:60 視為合格（params.compare 可改為逐欄位 le）。"
+ },
+ {
+  "key": "sshd_maxsessions",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0285",
+   "rhel9": "TWGCB-01-012-0277"
+  },
+  "category": "SSH 設定",
+  "title": "SSH MaxSessions 參數",
+  "expected": "4 以下，但須大於 0",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `MaxSessions 4`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "MaxSessions",
+   "value": [
+    1,
+    4
+   ],
+   "compare": "range"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `maxsessions` 的值須為 1 至 4 的整數。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `MaxSessions 4`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "預設 10，預設不合格。會影響 ControlMaster 多工連線（例如 Ansible 平行作業）與同一連線的多個 channel。"
+ },
+ {
+  "key": "sshd_strictmodes",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0286",
+   "rhel9": "TWGCB-01-012-0278"
+  },
+  "category": "SSH 設定",
+  "title": "SSH StrictModes 參數",
+  "expected": "yes",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `StrictModes yes`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "StrictModes",
+   "value": "yes",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `strictmodes` 的值須為 yes。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `StrictModes yes`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "sshd 設定變更需重新載入服務，設錯可能使 sshd 無法啟動或中斷遠端連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "OpenSSH 預設 yes，通常合格。開啟後家目錄或 ~/.ssh 權限過寬的使用者將無法用金鑰登入。"
+ },
+ {
+  "key": "sshd_compression",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0287",
+   "rhel9": "TWGCB-01-012-0279"
+  },
+  "category": "SSH 設定",
+  "title": "SSH Compression 參數",
+  "expected": "delayed 或 no",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `Compression no`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "Compression",
+   "value": [
+    "no",
+    "delayed",
+    "yes"
+   ],
+   "compare": "in"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `compression` 的值須為 no 或 delayed；OpenSSH 7.4 起 delayed 與 yes 相同（`sshd -T` 會輸出 yes），因此 yes 也視為等同 delayed 合格。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `Compression no`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "C",
+  "risk_reason": "（實作改為 C 類，原分析為 B 類，以程式為準）只影響壓縮功能，但仍需 reload sshd。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "OpenSSH 7.4 起已移除驗證前壓縮，`Compression delayed` 是 yes 的舊別名，`sshd -T` 會把 delayed 顯示為 yes。若只接受字面值 no/delayed，則預設值 yes 永遠判定不合格，即使實際行為已符合要求。工具需決定：建議 yes 視為合格並在說明中註記；若要求嚴格，修復時寫入 `Compression no`。"
+ },
+ {
+  "key": "sshd_ignoreuserknownhosts",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0288",
+   "rhel9": "TWGCB-01-012-0280"
+  },
+  "category": "SSH 設定",
+  "title": "SSH IgnoreUserKnownHosts 參數",
+  "expected": "yes",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `IgnoreUserKnownHosts yes`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "IgnoreUserKnownHosts",
+   "value": "yes",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `ignoreuserknownhosts` 的值須為 yes。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `IgnoreUserKnownHosts yes`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "只影響已停用的 hostbased 驗證，但仍需 reload sshd。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "預設 no，預設不合格。只影響 hostbased 驗證，對密碼與公鑰登入無影響。"
+ },
+ {
+  "key": "sshd_printlastlog",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0289",
+   "rhel9": "TWGCB-01-012-0281"
+  },
+  "category": "SSH 設定",
+  "title": "SSH PrintLastLog 參數",
+  "expected": "yes",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `PrintLastLog yes`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "",
+  "type": "sshd_option",
+  "params": {
+   "option": "PrintLastLog",
+   "value": "yes",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `printlastlog` 的值須為 yes。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `PrintLastLog yes`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "只影響登入訊息，但仍需 reload sshd。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "OpenSSH 預設 yes，通常合格。RHEL 的 PAM postlogin（pam_lastlog）也可能顯示上次登入資訊，兩者並存不影響判定。"
+ },
+ {
+  "key": "ssh_shosts_equiv_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0290",
+   "rhel9": "TWGCB-01-012-0282"
+  },
+  "category": "SSH 設定",
+  "title": "shosts.equiv 檔案",
+  "expected": "移除",
+  "doc_method": "`find / -name shosts.equiv` 尋找檔案，找到則刪除，例如 `rm /etc/ssh/shosts.equiv`。",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "desc": "尋找 shosts.equiv 檔案，存在即不合格；修復時移到備份區而非直接刪除。",
+   "paths": [
+    "/etc/ssh/shosts.equiv",
+    "/etc/shosts.equiv"
+   ]
+  },
+  "check": "檢查 /etc/ssh/shosts.equiv 與 /etc/shosts.equiv；另以 `find / -xdev -name shosts.equiv`（逐一本機檔案系統，略過 nfs/proc 等，設逾時）掃描其他位置。找到任何一個即不合格。",
+  "fix": "將找到的檔案（保留擁有者與權限）移到工具備份目錄，記錄原路徑；回滾時移回原位置。不直接 rm。",
+  "risk": "A",
+  "risk_reason": "hostbased 驗證已由 0276 停用，移除檔案（可回復）不影響正常登入。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "sshd 只讀 /etc/ssh/shosts.equiv（及 hosts.equiv 給 rhosts），其他位置的同名檔案實際上不會被使用，但文件要求全部尋找。全系統 find 在大型或掛載網路檔案系統的主機上很耗時，建議加 -xdev 與逾時。"
+ },
+ {
+  "key": "ssh_user_shosts_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0291",
+   "rhel9": "TWGCB-01-012-0283"
+  },
+  "category": "SSH 設定",
+  "title": ".shosts 檔案",
+  "expected": "移除",
+  "doc_method": "`find / -name '*.shosts'` 尋找檔案，找到則刪除，例如 `rm $HOME/.shosts`。",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "desc": "尋找使用者家目錄中的 .shosts 檔案，存在即不合格；修復時移到備份區。"
+  },
+  "check": "從 /etc/passwd 取得所有家目錄，檢查 `<家目錄>/.shosts` 是否存在；另可以 `find / -xdev -name '*.shosts'` 補掃（設逾時）。找到任何一個即不合格，報告列出檔案路徑與擁有者。",
+  "fix": "將檔案移到工具備份目錄（保留擁有者、權限與原路徑紀錄）；回滾時移回。家目錄在 NFS 等網路檔案系統上且 root 無權限（root_squash）時略過並列為人工處理。",
+  "risk": "C",
+  "risk_reason": "（實作改為 C 類，原分析為 A 類，以程式為準）hostbased 驗證已停用，此檔案不再被使用；採移動而非刪除，可回復。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "文件的 `find / -name '*.shosts'` 也會符合 foo.shosts 這類檔名，sshd 只讀取家目錄下的 `.shosts`。此檔位於使用者家目錄屬使用者資料，若單位政策要求不得異動使用者檔案，可改列 C 類只報告不修復。"
+ },
+ {
+  "key": "sshd_crypto_policy_no_override",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0292",
+   "rhel9": "TWGCB-01-012-0284"
+  },
+  "category": "SSH 設定",
+  "title": "覆寫全系統加密原則",
+  "expected": "停用",
+  "doc_method": "`sed -ri \"s/^\\s*(CRYPTO_POLICY\\s*=.*)$/# \\1/\" /etc/sysconfig/sshd`，再 `systemctl restart sshd`。",
+  "version_diff": "RHEL 8：sshd.service 透過 $CRYPTO_POLICY 環境變數帶入 crypto policy，/etc/sysconfig/sshd 若設定 CRYPTO_POLICY= 即覆寫（或停用）全系統原則，文件做法有效。RHEL 9：sshd.service 已不使用 CRYPTO_POLICY 變數，crypto policy 改由 /etc/ssh/sshd_config.d/50-redhat.conf 的 `Include /etc/crypto-policies/back-ends/opensshserver.config` 載入；覆寫方式變成在更早排序的 drop-in 或主檔中設定 Ciphers/MACs/KexAlgorithms 等，或移除該 Include。文件的 sed 在 RHEL 9 上通常無作用。",
+  "type": "custom",
+  "params": {
+   "file": "/etc/sysconfig/sshd",
+   "pattern": "^\\s*CRYPTO_POLICY\\s*=",
+   "rhel9_include": "/etc/crypto-policies/back-ends/opensshserver.config"
+  },
+  "check": "RHEL 8：/etc/sysconfig/sshd 不得有未註解的 `CRYPTO_POLICY=` 行（另確認 `systemctl cat sshd` 沒有 drop-in 以 Environment=CRYPTO_POLICY 覆寫）。RHEL 9：同樣檢查 /etc/sysconfig/sshd（相容文件），並確認 /etc/ssh/sshd_config.d/50-redhat.conf（或其他 drop-in）仍有生效的 `Include /etc/crypto-policies/back-ends/opensshserver.config`；可另列出在該 Include 之前出現的 Ciphers/MACs/KexAlgorithms/GSSAPIKexAlgorithms/HostKeyAlgorithms/PubkeyAcceptedAlgorithms 設定作為覆寫警示。",
+  "fix": "RHEL 8/9：備份 /etc/sysconfig/sshd，將 `CRYPTO_POLICY=` 行加上註解（等同文件 sed），RHEL 8 需 `sshd -t` 後 `systemctl restart sshd`（reload 不會重讀 EnvironmentFile）。RHEL 9 若 Include 被移除或註解則列為人工處理（恢復套件預設 50-redhat.conf 可用 `rpm -V openssh-server` 比對）。回滾：還原備份並 restart。",
+  "risk": "B",
+  "risk_reason": "恢復使用全系統加密原則會改變 sshd 可用演算法，舊用戶端可能無法連線。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 openssh-server",
+  "existing": false,
+  "notes": "與 0271/0263（SSH 加密演算法）互相牽制：若以覆寫方式滿足演算法清單會違反本項，因此 0271 建議用 crypto-policies 子原則。文件 sed 中的 `. *` 是 PDF 斷行，應為 `.*`。檔案不存在（RHEL 9 部分安裝）時視為合格。取消覆寫後若全系統原則為 LEGACY，sshd 仍可能使用弱演算法，需搭配 0271 檢查。"
+ },
+ {
+  "key": "sshd_gssapiauthentication",
+  "ids": {
+   "rhel8": null,
+   "rhel9": "TWGCB-01-012-0315"
+  },
+  "category": "SSH 設定",
+  "title": "停用 GSSAPI 驗證",
+  "expected": "停用",
+  "doc_method": "編輯 /etc/ssh/sshd_config，設定 `GSSAPIAuthentication no`，再執行 `systemctl restart sshd`（文件提醒先通知 SSH 使用者再重啟）。",
+  "version_diff": "僅 RHEL 9 有此項；RHEL 8 GCB 無對應規則。",
+  "type": "sshd_option",
+  "params": {
+   "option": "GSSAPIAuthentication",
+   "value": "no",
+   "compare": "eq"
+  },
+  "check": "執行 `sshd -T` 取得實際生效值（已含 Include 的 /etc/ssh/sshd_config.d/*.conf，關鍵字輸出為小寫），取 `gssapiauthentication` 的值須為 no。未安裝 sshd 時為不適用；`sshd -T` 失敗時為錯誤。",
+  "fix": "沿用工具既有 SshdOption 流程：備份 /etc/ssh/sshd_config 與 Include 的 drop-in 檔；於主檔全域區段（第一個 Match 之前）設定 `GSSAPIAuthentication no`，重複的全域設定加註解；註解 drop-in（RHEL 9 的 /etc/ssh/sshd_config.d/*.conf）中與目標值衝突的全域設定；執行 `sshd -t` 驗證語法，失敗則中止並還原，成功才 `systemctl reload sshd`。回滾：還原備份檔後 `sshd -t` 再 reload。",
+  "risk": "B",
+  "risk_reason": "使用 Kerberos/IdM（FreeIPA、AD）單一登入的環境停用後將無法以票證登入。",
+  "needs_reboot": false,
+  "applies_when": "RHEL 9 且已安裝 openssh-server",
+  "existing": false,
+  "notes": "RHEL 9 的 50-redhat.conf 預設 `GSSAPIAuthentication yes`，且先於主檔生效，必須註解該行（既有 SshdOption 流程已處理）。加入 IdM/AD 網域（ipa-client、sssd、realm join）的主機常依賴 GSSAPI 登入，修復前應確認；此類主機可列為例外。文件類別為 SSH 設定但編號 0315 位於表格末尾，屬 RHEL 9 新增項目。"
+ }
+]

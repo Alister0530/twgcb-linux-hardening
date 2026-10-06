@@ -1,0 +1,572 @@
+[
+  {
+    "id": "TWGCB-01-014-0029",
+    "category": "系統設定與維護",
+    "title": "sudo 套件",
+    "expected": "安裝",
+    "doc_method": "開啟終端機執行 `#apt install sudo` 安裝 sudo 套件。",
+    "type": "package_present",
+    "params": {
+      "pkg": "sudo"
+    },
+    "check": "執行 `dpkg-query -W -f='${Status}' sudo`，輸出含「install ok installed」即合格。",
+    "fix": "執行 `DEBIAN_FRONTEND=noninteractive apt-get install -y sudo`；修復前記錄套件原本未安裝的狀態。回滾：`apt-get purge -y sudo`（僅在原本未安裝時）。",
+    "risk": "A",
+    "risk_reason": "安裝套件不影響既有服務，且 Ubuntu 預設已安裝。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 伺服器預設已安裝 sudo，通常直接合格；文件說明中提到可將各使用者設定分存於 /etc/sudoers.d/，屬建議事項，不列入檢測。離線環境無法 apt 安裝時修復會失敗。"
+  },
+  {
+    "id": "TWGCB-01-014-0030",
+    "category": "系統設定與維護",
+    "title": "設定 sudo 指令使用 pty",
+    "expected": "Defaults use_pty",
+    "doc_method": "執行「visudo -f」編輯 /etc/sudoers 或 /etc/sudoers.d/ 目錄下之檔案，新增：`Defaults use_pty`",
+    "type": "custom",
+    "params": {
+      "description": "sudoers Defaults 旗標檢查",
+      "files": [
+        "/etc/sudoers",
+        "/etc/sudoers.d/*"
+      ],
+      "directive": "use_pty"
+    },
+    "check": "讀取 /etc/sudoers 及其 @includedir/#includedir 指向的 /etc/sudoers.d/ 下有效檔案（排除含「.」或以「~」結尾的檔名），忽略註解行，以正規表示式 `^\\s*Defaults\\s+([^\\s#]+,\\s*)*use_pty\\b` 比對；存在且之後沒有 `!use_pty` 覆蓋即合格。也可用 `sudo -V`（root 執行）輸出中是否含「Always allocate a pseudo terminal」(或類似字串) 作輔助驗證。",
+    "fix": "寫入 `Defaults use_pty` 到 /etc/sudoers.d/99-gcb。建立獨立檔案 /etc/sudoers.d/99-gcb（檔名不可含「.」或以「~」結尾，否則 sudo 會忽略），擁有者 root:root、權限 0440；寫入前先寫到暫存檔並以 `visudo -cf <暫存檔>` 驗證語法，通過後再搬移到位，最後執行 `visudo -c` 驗證整體設定。回滾：刪除該檔或還原其備份。不修改 /etc/sudoers 本身，無需備份該檔。",
+    "risk": "A",
+    "risk_reason": "新增 sudo 預設旗標且經 visudo 驗證，對一般使用影響極小。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 sudo",
+    "notes": "Ubuntu 22.04 預設 /etc/sudoers 不一定含 use_pty，需實際檢查。sudoers 語法錯誤會導致 sudo 全面失效，務必先以 visudo -cf 驗證再落地。use_pty 可能讓少數在背景執行 sudo 的腳本行為改變。"
+  },
+  {
+    "id": "TWGCB-01-014-0031",
+    "category": "系統設定與維護",
+    "title": "sudo 自定義日誌檔案",
+    "expected": "啟用",
+    "doc_method": "執行「visudo -f」編輯 /etc/sudoers 或 /etc/sudoers.d/ 目錄下之檔案，新增：`Defaults logfile=\"(日誌檔案路徑)\"`；範例：`Defaults logfile=\"/var/log/sudo.log\"`",
+    "type": "custom",
+    "params": {
+      "description": "sudoers Defaults logfile 存在檢查",
+      "files": [
+        "/etc/sudoers",
+        "/etc/sudoers.d/*"
+      ],
+      "directive": "logfile",
+      "default_value": "/var/log/sudo.log"
+    },
+    "check": "同 0030 方式掃描 sudoers 有效檔案，以正規表示式 `^\\s*Defaults\\s+([^#]*,\\s*)?logfile\\s*=\\s*\"?[^\",\\s]+` 比對；存在任一非空路徑設定即合格（不限定路徑值）。",
+    "fix": "寫入 `Defaults logfile=\"/var/log/sudo.log\"` 到 /etc/sudoers.d/99-gcb（與 0030 共用檔案時以區塊合併）。建立獨立檔案 /etc/sudoers.d/99-gcb（檔名不可含「.」或以「~」結尾，否則 sudo 會忽略），擁有者 root:root、權限 0440；寫入前先寫到暫存檔並以 `visudo -cf <暫存檔>` 驗證語法，通過後再搬移到位，最後執行 `visudo -c` 驗證整體設定。回滾：刪除該檔或還原其備份。",
+    "risk": "A",
+    "risk_reason": "只新增 sudo 本地日誌輸出，不影響授權行為。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 sudo",
+    "notes": "GCB 設定值只要求「啟用」，路徑可自訂，檢測時只要求有 logfile 設定。Ubuntu 22.04 預設沒有此設定（只走 syslog/journald）。/var/log/sudo.log 會在第一次執行 sudo 時建立，可考慮另行設定 logrotate，非 GCB 要求。"
+  },
+  {
+    "id": "TWGCB-01-014-0032",
+    "category": "系統設定與維護",
+    "title": "sudo 身分鑑別逾時時間",
+    "expected": "5 分鐘(含)以下，但須大於 0",
+    "doc_method": "執行「visudo -f」編輯 /etc/sudoers 或 /etc/sudoers.d/ 目錄下之檔案，新增或修改：`Defaults env_reset,timestamp_timeout=5`",
+    "type": "custom",
+    "params": {
+      "description": "sudoers timestamp_timeout 數值範圍",
+      "files": [
+        "/etc/sudoers",
+        "/etc/sudoers.d/*"
+      ],
+      "directive": "timestamp_timeout",
+      "compare": "range",
+      "min_exclusive": 0,
+      "max": 5
+    },
+    "check": "依 sudoers 解析順序（/etc/sudoers 內 includedir 所在位置，sudoers.d 依檔名字典序）收集所有 `Defaults`（不含 Defaults:user/@host 等限定形式，另行列出警告）中的 `timestamp_timeout=N`；以最後一個生效值判斷，0 < N <= 5 即合格。完全未設定時 Ubuntu 預設為 15 分鐘，判定不合格。若有 Defaults:使用者 形式設定超出範圍也判不合格。",
+    "fix": "在 /etc/sudoers.d/99-gcb 寫入 `Defaults env_reset,timestamp_timeout=5`。因 sudoers.d 在 /etc/sudoers 末端被引入，drop-in 會覆蓋主檔設定；若其他 sudoers.d 檔名排序在 99-gcb 之後且設定了不合格值，回報需人工處理而不自動修改。建立獨立檔案 /etc/sudoers.d/99-gcb（檔名不可含「.」或以「~」結尾，否則 sudo 會忽略），擁有者 root:root、權限 0440；寫入前先寫到暫存檔並以 `visudo -cf <暫存檔>` 驗證語法，通過後再搬移到位，最後執行 `visudo -c` 驗證整體設定。回滾：刪除該檔或還原其備份。",
+    "risk": "A",
+    "risk_reason": "僅縮短 sudo 快取時間，使用者最多多輸入幾次通行碼。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 sudo",
+    "notes": "timestamp_timeout 可為小數；負值代表永不逾時，0 代表每次都要輸入，兩者皆不合格。Ubuntu 22.04 /etc/sudoers 預設已有 `Defaults env_reset`，drop-in 重複設定 env_reset 無害。"
+  },
+  {
+    "id": "TWGCB-01-014-0033",
+    "category": "系統設定與維護",
+    "title": "AIDE 套件",
+    "expected": "安裝",
+    "doc_method": "執行 `#apt install aide aide-common` 安裝 AIDE；執行 `#aideinit` 初始化，再執行 `#mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db`。",
+    "type": "package_present",
+    "params": {
+      "pkg": [
+        "aide",
+        "aide-common"
+      ],
+      "post_install": [
+        "aideinit",
+        "mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db"
+      ]
+    },
+    "check": "`dpkg-query -W -f='${Status}' aide aide-common` 兩者皆為「install ok installed」，且 /var/lib/aide/aide.db 存在（代表已初始化）即合格。",
+    "fix": "執行 `DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends aide aide-common`，再執行 `aideinit -y -f`（非互動，完成後自動將 aide.db.new 複製為 aide.db；若沒有 aide.db 則執行文件的 mv）。修復前記錄兩套件是否已安裝。回滾：若原本未安裝則 `apt-get purge -y aide aide-common` 並刪除 /var/lib/aide/aide.db*。",
+    "risk": "B",
+    "risk_reason": "aideinit 需掃描整個檔案系統，可能耗時數分鐘到數十分鐘並造成大量 I/O。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設未安裝。aide 的 Recommends 可能帶入 MTA（如 postfix），建議 --no-install-recommends 避免多裝郵件服務。aideinit 預設設定檔為 /etc/aide/aide.conf。初始化建議在系統修復完成後再做，否則後續修改會在第一次檢查時被列為變更。"
+  },
+  {
+    "id": "TWGCB-01-014-0034",
+    "category": "系統設定與維護",
+    "title": "定期檢查檔案系統完整性",
+    "expected": "每天",
+    "doc_method": "執行 `#crontab -u root -e`，新增：`0 5 * * * /usr/bin/aide --config /etc/aide/aide.conf --check`（每天 5 點檢查）。",
+    "type": "custom",
+    "params": {
+      "description": "排程中存在每日 aide --check",
+      "cron_line": "0 5 * * * /usr/bin/aide --config /etc/aide/aide.conf --check"
+    },
+    "check": "以下任一成立即合格：(1) `crontab -u root -l` 中有未註解且含 `aide` 與 `--check` 的每日排程；(2) /etc/crontab 或 /etc/cron.d/* 中有每日執行 aide --check 的行；(3) /etc/cron.daily/ 下有可執行的 aide 腳本（aide-common 內附的 /etc/cron.daily/aide）；(4) `systemctl is-enabled dailyaidecheck.timer` 或其他執行 aide --check 的 timer 為 enabled。排程欄位需確認頻率為每天（分、時為固定值，日、月、週為 *）。",
+    "fix": "建立 /etc/cron.d/gcb-aide，權限 0644 root:root，內容：`0 5 * * * root /usr/bin/aide --config /etc/aide/aide.conf --check`（cron.d 格式需多一個使用者欄位）。不修改 root 的 crontab，避免需要解析與備份使用者 crontab。回滾：刪除 /etc/cron.d/gcb-aide。",
+    "risk": "A",
+    "risk_reason": "只新增排程檔案，可直接刪除回滾。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 aide（依賴 0033）",
+    "notes": "文件用 `crontab -u root -e` 互動編輯，自動化改用 /etc/cron.d drop-in，效果相同。Ubuntu 22.04 的 aide-common 已附 /etc/cron.daily/aide，安裝後可能已合格；檢測應接受此形式。aide 未初始化（無 aide.db）時排程會失敗，修復前應確認 0033 完成。"
+  },
+  {
+    "id": "TWGCB-01-014-0035",
+    "category": "系統設定與維護",
+    "title": "開機載入程式設定檔之所有權",
+    "expected": "root:root",
+    "doc_method": "BIOS 系統：`#chown root:root /boot/grub/grub.cfg`、`#chown root:root /boot/grub/grubenv`。UEFI 系統：編輯 /etc/fstab，在掛載點「/boot/efi」列第 4 欄加入「uid=0,gid=0」，範例：`<device> /boot/efi vfat umask=0077,uid=0,gid=0 0 1`",
+    "type": "file_perm",
+    "params": {
+      "path": [
+        "/boot/grub/grub.cfg",
+        "/boot/grub/grubenv"
+      ],
+      "owner": "root",
+      "group": "root",
+      "max_mode": null,
+      "uefi_extra": {
+        "type": "mount_option",
+        "mount": "/boot/efi",
+        "option": [
+          "uid=0",
+          "gid=0"
+        ]
+      }
+    },
+    "check": "對 /boot/grub/grub.cfg、/boot/grub/grubenv（存在者）以 os.stat 確認 uid=0、gid=0。若 /sys/firmware/efi 存在且 /boot/efi 有掛載，另讀 /proc/mounts 中 /boot/efi 的選項：vfat 未指定 uid/gid 時預設為掛載者（root=0），uid=0,gid=0 視同合格；若 /etc/fstab 指定了非 0 的 uid/gid 則不合格。",
+    "fix": "記錄原 uid/gid，對兩檔執行 os.chown(path, 0, 0)。回滾依記錄還原。UEFI 的 /etc/fstab 修改僅在偵測到 uid/gid 非 0 時才做，且歸類為 B：備份 /etc/fstab，只修改 /boot/efi 列第 4 欄，修改後以 `findmnt --verify` 驗證，並 `mount -o remount /boot/efi`。",
+    "risk": "A",
+    "risk_reason": "BIOS 及 /boot/grub 下檔案的 chown 為低風險；只有需改 fstab 的 UEFI 情況才屬 B。",
+    "needs_reboot": false,
+    "applies_when": "使用 GRUB 開機（/boot/grub/grub.cfg 存在）",
+    "notes": "文件 UEFI 說明寫「uid=0, and gid=0」為筆誤，正確為 `uid=0,gid=0`。Ubuntu 22.04 不論 BIOS 或 UEFI，主要 grub.cfg 都在 /boot/grub/grub.cfg（/boot/efi/EFI/ubuntu/grub.cfg 只是轉向的 stub），因此兩種系統都應檢查 /boot/grub 下的檔案。Ubuntu 預設 fstab 的 /boot/efi 已是 `umask=0077`，未指定 uid/gid 時即為 root。"
+  },
+  {
+    "id": "TWGCB-01-014-0036",
+    "category": "系統設定與維護",
+    "title": "開機載入程式設定檔之權限",
+    "expected": "600 或更低權限",
+    "doc_method": "BIOS 系統：`#chmod 600 /boot/grub/grub.cfg`、`#chmod 600 /boot/grub/grubenv`。UEFI 系統：編輯 /etc/fstab，在掛載點「/boot/efi」列第 4 欄加入「fmask=0177」，範例：`<device> /boot/efi vfat umask=0077,fmask=0177 0 1`",
+    "type": "file_perm",
+    "params": {
+      "path": [
+        "/boot/grub/grub.cfg",
+        "/boot/grub/grubenv"
+      ],
+      "owner": null,
+      "group": null,
+      "max_mode": "0600",
+      "uefi_extra": {
+        "type": "mount_option",
+        "mount": "/boot/efi",
+        "option": [
+          "fmask=0177"
+        ]
+      }
+    },
+    "check": "對 /boot/grub/grub.cfg、/boot/grub/grubenv（存在者）確認 st_mode & 0o7777 & ~0o600 == 0。UEFI 系統另讀 /proc/mounts 的 /boot/efi 選項，fmask（或 umask，fmask 未指定時以 umask 計算）需遮蔽 0177 以上的位元，即 (mask & 0o177) == 0o177；umask=0077 時檔案權限為 600，視同合格。",
+    "fix": "記錄原權限後執行 os.chmod(path, mode & 0o600)。回滾依記錄還原。UEFI 的 fstab 修改只有在 /boot/efi 的實際權限超過 600 時才需要，歸類 B：備份 /etc/fstab，在 /boot/efi 列第 4 欄加入 fmask=0177，以 `findmnt --verify` 驗證後 `mount -o remount /boot/efi`。",
+    "risk": "A",
+    "risk_reason": "移除 grub.cfg 群組與其他人權限只影響非 root 讀取，不影響開機。",
+    "needs_reboot": false,
+    "applies_when": "使用 GRUB 開機（/boot/grub/grub.cfg 存在）",
+    "notes": "Ubuntu 22.04 的 update-grub（grub-mkconfig）重新產生 grub.cfg 時預設權限為 0444 或 0644，核心更新後會再次不合格；可在報告中提示，或於 /etc/grub.d 外另行處理（例如 dpkg 觸發後重跑本工具）。grubenv 預設 0644。文件 UEFI 範例只加 fmask，與 0035 的 uid/gid 範例應合併為同一列。"
+  },
+  {
+    "id": "TWGCB-01-014-0037",
+    "category": "系統設定與維護",
+    "title": "開機載入程式之通行碼",
+    "expected": "設定通行碼",
+    "doc_method": "執行 `#grub-mkpasswd-pbkdf2` 輸入兩次通行碼產生雜湊；編輯 /etc/grub.d/40_custom 新增：`set superusers=\"(使用者名稱)\"` 與 `password_pbkdf2 (使用者名稱) (pbkdf2 雜湊後通行碼)`；執行 `#update-grub` 更新設定檔。",
+    "type": "custom",
+    "params": {
+      "description": "GRUB superusers 與 pbkdf2 通行碼",
+      "check_file": "/boot/grub/grub.cfg",
+      "dropin": "/etc/grub.d/41_gcb_password"
+    },
+    "check": "讀取 /boot/grub/grub.cfg，未註解行同時存在 `^\\s*set\\s+superusers=\"?\\S+\"?` 與 `^\\s*password_pbkdf2\\s+\\S+\\s+grub\\.pbkdf2\\.sha512\\.\\S+`，且 password_pbkdf2 的使用者名稱包含在 superusers 中即合格。只看 /etc/grub.d 而未 update-grub 不算合格。",
+    "fix": "需由管理者提供使用者名稱與通行碼（或預先以 grub-mkpasswd-pbkdf2 產生的雜湊），工具不可自行產生通行碼。建立獨立檔案 /etc/grub.d/41_gcb_password（root:root、0755），內容為 `#!/bin/sh` 與 `cat <<'EOF'` 輸出 set superusers 及 password_pbkdf2 兩行；備份 /boot/grub/grub.cfg 後執行 `update-grub`。回滾：刪除 41_gcb_password 並重新執行 update-grub（或還原 grub.cfg 備份）。不直接修改 40_custom，避免與使用者既有內容混在一起。",
+    "risk": "B",
+    "risk_reason": "設錯或遺失通行碼可能導致無法編輯開機項目甚至無法開機，且需人工輸入通行碼。",
+    "needs_reboot": false,
+    "applies_when": "使用 GRUB 開機",
+    "notes": "Ubuntu 22.04 設定 superusers 後，預設所有開機項目（含正常開機）都要求輸入通行碼，遠端/無人值守伺服器會卡在開機畫面；通常需在 /etc/grub.d/10_linux 的 CLASS 加上 `--unrestricted`，只保護編輯與命令列，但這會修改套件檔案（升級時可能被覆蓋），需人工決定。修復須互動輸入通行碼，若工具不提供輸入則應降為 C。設定在下次開機生效，檢測 grub.cfg 即可，不需立刻重開機。"
+  },
+  {
+    "id": "TWGCB-01-014-0038",
+    "category": "系統設定與維護",
+    "title": "單一使用者模式身分鑑別",
+    "expected": "啟用",
+    "doc_method": "執行 `#passwd root` 設定 root 帳號通行碼。",
+    "type": "custom",
+    "params": {
+      "description": "root 帳號具有有效通行碼雜湊，使單一使用者模式需鑑別",
+      "file": "/etc/shadow",
+      "user": "root"
+    },
+    "check": "讀取 /etc/shadow 中 root 的第 2 欄：為以 `$` 開頭的有效雜湊（如 $y$、$6$）即合格；為空字串則不合格（無密碼可直接進入）；為 `!`、`*` 或以 `!` 開頭（鎖定）時，Ubuntu 22.04 的 sulogin 會拒絕進入救援 shell，可判為「合格（root 鎖定）」並在報告中註記。另可確認 /usr/lib/systemd/system/rescue.service 與 emergency.service 的 ExecStart 使用 systemd-sulogin-shell（未被覆寫成直接開 shell）。",
+    "fix": "不自動修復：需由管理者手動執行 `passwd root` 設定通行碼。工具只輸出指引。",
+    "risk": "C",
+    "risk_reason": "需人工輸入 root 通行碼，且是否啟用 root 通行碼屬管理政策決定。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 root 為鎖定狀態（shadow 欄位為 `!` 或 `*`），文件要求設定 root 通行碼；但鎖定狀態下 sulogin 也不會給予無鑑別 shell，是否視為合格需專案決定。設定 root 通行碼會增加一個可用的特權帳號，應配合 SSH PermitRootLogin 等規則。"
+  },
+  {
+    "id": "TWGCB-01-014-0039",
+    "category": "系統設定與維護",
+    "title": "核心傾印功能",
+    "expected": "停用",
+    "doc_method": "(1) 編輯 /etc/security/limits.conf 或 /etc/security/limits.d/ 下檔案，新增 `* hard core 0`；(2) 編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案設定 `fs.suid_dumpable=0`，並執行 `#sysctl -w fs.suid_dumpable=0`；(3) 若已安裝 systemd-coredump，編輯 /etc/systemd/coredump.conf，新增或修改 `Storage=none`、`ProcessSizeMax=0`，執行 `#systemctl daemon-reload`；(4) 執行 `#systemctl --now mask systemd-coredump.socket`。",
+    "type": "custom",
+    "params": {
+      "description": "核心傾印多項設定組合",
+      "limits": {
+        "path": "/etc/security/limits.d/99-gcb-coredump.conf",
+        "line": "* hard core 0"
+      },
+      "sysctl": [
+        "fs.suid_dumpable=0"
+      ],
+      "coredump_conf": {
+        "path": "/etc/systemd/coredump.conf.d/99-gcb.conf",
+        "Storage": "none",
+        "ProcessSizeMax": "0"
+      },
+      "mask_units": [
+        "systemd-coredump.socket"
+      ]
+    },
+    "check": "全部成立才合格：(1) /etc/security/limits.conf 與 /etc/security/limits.d/*.conf 中有未註解的 `*` 網域 `hard` `core` `0` 行，且沒有其他行把 * 的 hard core 設為非 0；(2) `sysctl -n fs.suid_dumpable` 為 0，且 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d、/usr/lib/sysctl.d 依 systemd-sysctl 優先順序最終值為 0；(3) 若 `dpkg-query` 顯示 systemd-coredump 已安裝：`systemd-analyze cat-config systemd/coredump.conf` 合併後 Storage=none 且 ProcessSizeMax=0，且 `systemctl is-enabled systemd-coredump.socket` 為 masked。未安裝 systemd-coredump 時 (3) 略過。",
+    "fix": "(1) 建立 /etc/security/limits.d/99-gcb-coredump.conf 內容 `* hard core 0`；(2) 建立 /etc/sysctl.d/99-gcb-coredump.conf 內容 `fs.suid_dumpable = 0`，記錄目前 runtime 值後執行 `sysctl -w fs.suid_dumpable=0`；(3) 已安裝 systemd-coredump 時建立 /etc/systemd/coredump.conf.d/99-gcb.conf（[Coredump] 區段，Storage=none、ProcessSizeMax=0），執行 `systemctl daemon-reload`；(4) 記錄 systemd-coredump.socket 的 is-enabled/is-active 狀態後執行 `systemctl --now mask systemd-coredump.socket`。回滾：刪除三個 drop-in、sysctl -w 還原舊值、unmask 並依記錄恢復啟用狀態。不修改 limits.conf、coredump.conf 主檔，故無需備份主檔。",
+    "risk": "A",
+    "risk_reason": "停用核心傾印只影響程式當機時的除錯資料，不影響服務運作。",
+    "needs_reboot": false,
+    "applies_when": "一律（systemd-coredump 部分僅在已安裝時）",
+    "notes": "limits 設定只對新登入的 session 生效；systemd 服務不讀 limits.conf，受 LimitCORE 控制。Ubuntu 22.04 預設未安裝 systemd-coredump，但預設安裝 apport，apport 啟動時會把 fs.suid_dumpable 改為 2 並接管 core_pattern，會使 sysctl 檢查不合格，需配合 0042 停用 apport。若 sysctl.d 中已有檔名排序在 99-gcb-coredump 之後的檔案設定其他值，需人工處理。"
+  },
+  {
+    "id": "TWGCB-01-014-0040",
+    "category": "系統設定與維護",
+    "title": "記憶體位址空間配置隨機載入",
+    "expected": "2",
+    "doc_method": "編輯 /etc/sysctl.conf 或 /etc/sysctl.d/ 下檔案設定 `kernel.randomize_va_space=2`；執行 `#sysctl -w kernel.randomize_va_space=2`。",
+    "type": "sysctl",
+    "params": {
+      "settings": [
+        "kernel.randomize_va_space=2"
+      ]
+    },
+    "check": "`sysctl -n kernel.randomize_va_space` 為 2，且 sysctl 設定檔（/etc/sysctl.conf、/etc/sysctl.d、/run/sysctl.d、/usr/local/lib/sysctl.d、/usr/lib/sysctl.d）依優先順序沒有設定成其他值即合格。",
+    "fix": "建立 /etc/sysctl.d/99-gcb-aslr.conf 內容 `kernel.randomize_va_space = 2`；記錄目前 runtime 值後執行 `sysctl -w kernel.randomize_va_space=2`。回滾：刪除該檔並以 sysctl -w 還原舊值。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 預設值即為 2，設定不影響正常服務。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 核心預設即為 2（/usr/lib/sysctl.d 或 /etc/sysctl.d/10-kernel-hardening.conf 註解中有相關說明），通常直接合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0041",
+    "category": "系統設定與維護",
+    "title": "prelink 套件",
+    "expected": "移除",
+    "doc_method": "執行 `#apt purge prelink` 移除 prelink 套件。",
+    "type": "package_absent",
+    "params": {
+      "pkg": "prelink"
+    },
+    "check": "`dpkg-query -W -f='${Status}' prelink` 不存在或狀態不是「install ok installed」即合格。",
+    "fix": "執行 `prelink -ua` 還原已預連結的二進位檔（若指令存在），再執行 `DEBIAN_FRONTEND=noninteractive apt-get purge -y prelink`。備份：記錄套件版本與 /etc/default/prelink、/etc/prelink.conf 內容。回滾：`apt-get install -y prelink=<版本>` 並還原設定檔。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 預設未安裝，移除不影響系統功能。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設未安裝 prelink，且官方套件庫中已不再提供，通常直接合格；回滾可能因套件庫無此套件而無法重新安裝。移除前先 `prelink -ua` 可避免 AIDE 等完整性檢查出現大量誤報。"
+  },
+  {
+    "id": "TWGCB-01-014-0042",
+    "category": "系統設定與維護",
+    "title": "自動錯誤回報服務",
+    "expected": "停用",
+    "doc_method": "執行 `#systemctl --now mask apport.service` 停用 apport 服務。",
+    "type": "service_disabled",
+    "params": {
+      "units": [
+        "apport.service"
+      ],
+      "method": "mask"
+    },
+    "check": "若 apport 未安裝（dpkg-query 無 apport）即合格；已安裝時 `systemctl is-enabled apport.service` 為 masked 且 `systemctl is-active apport.service` 不為 active 即合格。可另檢查 /etc/default/apport 的 `enabled=0` 作輔助資訊。",
+    "fix": "記錄 apport.service 的 is-enabled 與 is-active 狀態，執行 `systemctl --now mask apport.service`。回滾：`systemctl unmask apport.service`，依記錄 enable/start。",
+    "risk": "A",
+    "risk_reason": "停用錯誤回報服務不影響伺服器正常運作。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 apport",
+    "notes": "Ubuntu 22.04 伺服器預設安裝 apport 並啟用。apport.service 是 oneshot 服務，停止時會還原 core_pattern；除 mask 之外，可選擇將 /etc/default/apport 設為 enabled=0（非 GCB 要求）。另有 apport-forward.socket（容器轉送用），文件未要求。"
+  },
+  {
+    "id": "TWGCB-01-014-0043",
+    "category": "系統設定與維護",
+    "title": "/etc/passwd 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "執行 `#chown root:root /etc/passwd`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/passwd",
+      "owner": "root",
+      "group": "root",
+      "max_mode": null
+    },
+    "check": "os.stat('/etc/passwd')，以 pwd/grp 解析 st_uid/st_gid；擁有者為 root 且群組為 root 即合格。",
+    "fix": "備份目前的 uid/gid（記錄 stat 結果即可，無需複製檔案內容），執行 os.chown('/etc/passwd', 0, gid)（gid 取 root；若目前群組已是允許清單中的其他值則不變更）。回滾：依記錄還原 uid/gid。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 預設即為 root:root，修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 root:root 0644，通常直接合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0044",
+    "category": "系統設定與維護",
+    "title": "/etc/passwd 檔案權限",
+    "expected": "644 或更低權限",
+    "doc_method": "執行 `#chmod 644 /etc/passwd`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/passwd",
+      "owner": null,
+      "group": null,
+      "max_mode": "0644"
+    },
+    "check": "os.stat('/etc/passwd').st_mode & 0o7777，確認沒有超出 0644 的權限位元（mode & ~0644 == 0）即合格。",
+    "fix": "記錄目前權限（stat 結果），執行 os.chmod('/etc/passwd', 現有權限 & 0644)（只移除多餘位元，不擴大權限）。回滾：依記錄還原原權限。",
+    "risk": "A",
+    "risk_reason": "只移除多餘權限位元，系統仍可讀取帳號資訊。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 0644，通常直接合格。依文件「或更低權限」，600 等也判合格，但 /etc/passwd 若移除其他人讀取權限，一般使用者程式將無法解析使用者名稱，可在報告中提示。"
+  },
+  {
+    "id": "TWGCB-01-014-0045",
+    "category": "系統設定與維護",
+    "title": "/etc/shadow 檔案所有權",
+    "expected": "root:root 或 root:shadow",
+    "doc_method": "執行以下任一指令：`#chown root:root /etc/shadow` 或 `#chown root:shadow /etc/shadow`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/shadow",
+      "owner": "root",
+      "group": [
+        "root",
+        "shadow"
+      ],
+      "max_mode": null
+    },
+    "check": "os.stat('/etc/shadow')，以 pwd/grp 解析 st_uid/st_gid；擁有者為 root 且群組為 root 或 shadow 即合格。",
+    "fix": "備份目前的 uid/gid（記錄 stat 結果即可，無需複製檔案內容），執行 os.chown('/etc/shadow', 0, gid)（gid 取 root；若目前群組已是允許清單中的其他值則不變更）。回滾：依記錄還原 uid/gid。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 預設即為 root:shadow，符合允許值。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 root:shadow 0640，直接合格。修復若遇到不合格群組，優先改為 root:shadow，以保留 unix_chkpwd 等 setgid shadow 程式的運作。"
+  },
+  {
+    "id": "TWGCB-01-014-0046",
+    "category": "系統設定與維護",
+    "title": "/etc/shadow 檔案權限",
+    "expected": "000",
+    "doc_method": "執行 `#chmod 000 /etc/shadow`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/shadow",
+      "owner": null,
+      "group": null,
+      "max_mode": "0000"
+    },
+    "check": "os.stat('/etc/shadow').st_mode & 0o7777，確認沒有超出 0000 的權限位元（mode & ~0000 == 0）即合格。",
+    "fix": "記錄目前權限（stat 結果），執行 os.chmod('/etc/shadow', 現有權限 & 0000)（只移除多餘位元，不擴大權限）。回滾：依記錄還原原權限。",
+    "risk": "A",
+    "risk_reason": "root 透過 CAP_DAC_OVERRIDE 仍可讀寫，以 root 執行的 sshd/login/passwd 不受影響。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設為 0640（root:shadow），一定不合格。改為 000 後，以非 root 身分透過 setgid shadow 的 unix_chkpwd 驗證通行碼的程式（如桌面螢幕鎖定、部分以一般使用者執行的應用程式）會失效；伺服器環境影響小，但需在報告中提醒。passwd/useradd 等工具更新 shadow 時通常會保留原權限，但部分工具可能重設權限，需重新檢測。"
+  },
+  {
+    "id": "TWGCB-01-014-0047",
+    "category": "系統設定與維護",
+    "title": "/etc/group 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "執行 `#chown root:root /etc/group`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/group",
+      "owner": "root",
+      "group": "root",
+      "max_mode": null
+    },
+    "check": "os.stat('/etc/group')，以 pwd/grp 解析 st_uid/st_gid；擁有者為 root 且群組為 root 即合格。",
+    "fix": "備份目前的 uid/gid（記錄 stat 結果即可，無需複製檔案內容），執行 os.chown('/etc/group', 0, gid)（gid 取 root；若目前群組已是允許清單中的其他值則不變更）。回滾：依記錄還原 uid/gid。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 預設即為 root:root，修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 root:root 0644，通常直接合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0048",
+    "category": "系統設定與維護",
+    "title": "/etc/group 檔案權限",
+    "expected": "644 或更低權限",
+    "doc_method": "執行 `#chmod 644 /etc/group`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/group",
+      "owner": null,
+      "group": null,
+      "max_mode": "0644"
+    },
+    "check": "os.stat('/etc/group').st_mode & 0o7777，確認沒有超出 0644 的權限位元（mode & ~0644 == 0）即合格。",
+    "fix": "記錄目前權限（stat 結果），執行 os.chmod('/etc/group', 現有權限 & 0644)（只移除多餘位元，不擴大權限）。回滾：依記錄還原原權限。",
+    "risk": "A",
+    "risk_reason": "只移除多餘權限位元，系統仍可讀取群組資訊。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 0644，通常直接合格。"
+  },
+  {
+    "id": "TWGCB-01-014-0049",
+    "category": "系統設定與維護",
+    "title": "/etc/gshadow 檔案所有權",
+    "expected": "root:root 或 root:shadow",
+    "doc_method": "執行以下任一指令：`#chown root:root /etc/gshadow` 或 `#chown root:shadow /etc/gshadow`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/gshadow",
+      "owner": "root",
+      "group": [
+        "root",
+        "shadow"
+      ],
+      "max_mode": null
+    },
+    "check": "os.stat('/etc/gshadow')，以 pwd/grp 解析 st_uid/st_gid；擁有者為 root 且群組為 root 或 shadow 即合格。",
+    "fix": "備份目前的 uid/gid（記錄 stat 結果即可，無需複製檔案內容），執行 os.chown('/etc/gshadow', 0, gid)（gid 取 root；若目前群組已是允許清單中的其他值則不變更）。回滾：依記錄還原 uid/gid。",
+    "risk": "A",
+    "risk_reason": "Ubuntu 預設即為 root:shadow，符合允許值。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 root:shadow 0640，直接合格。修復時優先改為 root:shadow。"
+  },
+  {
+    "id": "TWGCB-01-014-0050",
+    "category": "系統設定與維護",
+    "title": "/etc/gshadow 檔案權限",
+    "expected": "000",
+    "doc_method": "執行 `#chmod 000 /etc/gshadow`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/gshadow",
+      "owner": null,
+      "group": null,
+      "max_mode": "0000"
+    },
+    "check": "os.stat('/etc/gshadow').st_mode & 0o7777，確認沒有超出 0000 的權限位元（mode & ~0000 == 0）即合格。",
+    "fix": "記錄目前權限（stat 結果），執行 os.chmod('/etc/gshadow', 現有權限 & 0000)（只移除多餘位元，不擴大權限）。回滾：依記錄還原原權限。",
+    "risk": "A",
+    "risk_reason": "root 仍可存取，一般伺服器運作不需非 root 讀取 gshadow。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "Ubuntu 22.04 預設 0640（root:shadow），一定不合格。改為 000 後，setgid shadow 的程式（如 unix_chkpwd）無法讀取，伺服器影響小。"
+  },
+  {
+    "id": "TWGCB-01-014-0051",
+    "category": "系統設定與維護",
+    "title": "/etc/passwd- 檔案所有權",
+    "expected": "root:root",
+    "doc_method": "執行 `#chown root:root /etc/passwd-`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/passwd-",
+      "owner": "root",
+      "group": "root",
+      "max_mode": null
+    },
+    "check": "os.stat('/etc/passwd-')，以 pwd/grp 解析 st_uid/st_gid；擁有者為 root 且群組為 root 即合格。",
+    "fix": "備份目前的 uid/gid（記錄 stat 結果即可，無需複製檔案內容），執行 os.chown('/etc/passwd-', 0, gid)（gid 取 root；若目前群組已是允許清單中的其他值則不變更）。回滾：依記錄還原 uid/gid。",
+    "risk": "A",
+    "risk_reason": "備份檔所有權修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "/etc/passwd- 存在",
+    "notes": "/etc/passwd- 是 shadow 工具（useradd/usermod/vipw 等）修改時產生的備份檔，全新安裝可能不存在；不存在時應判定為「不適用」而非不合格。Ubuntu 預設 root:root 0644。"
+  },
+  {
+    "id": "TWGCB-01-014-0052",
+    "category": "系統設定與維護",
+    "title": "/etc/passwd- 檔案權限",
+    "expected": "644 或更低權限",
+    "doc_method": "執行 `#chmod 644 /etc/passwd-`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/passwd-",
+      "owner": null,
+      "group": null,
+      "max_mode": "0644"
+    },
+    "check": "os.stat('/etc/passwd-').st_mode & 0o7777，確認沒有超出 0644 的權限位元（mode & ~0644 == 0）即合格。",
+    "fix": "記錄目前權限（stat 結果），執行 os.chmod('/etc/passwd-', 現有權限 & 0644)（只移除多餘位元，不擴大權限）。回滾：依記錄還原原權限。",
+    "risk": "A",
+    "risk_reason": "只移除備份檔多餘權限位元，不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "/etc/passwd- 存在",
+    "notes": "檔案可能不存在，不存在時判定為不適用。Ubuntu 預設 0644。"
+  },
+  {
+    "id": "TWGCB-01-014-0053",
+    "category": "系統設定與維護",
+    "title": "/etc/shadow- 檔案所有權",
+    "expected": "root:root 或 root:shadow",
+    "doc_method": "執行以下任一指令：`#chown root:root /etc/shadow-` 或 `#chown root:shadow /etc/shadow-`。",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/shadow-",
+      "owner": "root",
+      "group": [
+        "root",
+        "shadow"
+      ],
+      "max_mode": null
+    },
+    "check": "os.stat('/etc/shadow-')，以 pwd/grp 解析 st_uid/st_gid；擁有者為 root 且群組為 root 或 shadow 即合格。",
+    "fix": "備份目前的 uid/gid（記錄 stat 結果即可，無需複製檔案內容），執行 os.chown('/etc/shadow-', 0, gid)（gid 取 root；若目前群組已是允許清單中的其他值則不變更）。回滾：依記錄還原 uid/gid。",
+    "risk": "A",
+    "risk_reason": "備份檔所有權修正不影響系統運作。",
+    "needs_reboot": false,
+    "applies_when": "/etc/shadow- 存在",
+    "notes": "檔案可能不存在，不存在時判定為不適用。Ubuntu 22.04 預設 root:shadow（權限 0640 或 0600）。"
+  }
+]

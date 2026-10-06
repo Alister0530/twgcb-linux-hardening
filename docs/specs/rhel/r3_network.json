@@ -1,0 +1,1211 @@
+[
+ {
+  "key": "xinetd_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0092",
+   "rhel9": "TWGCB-01-012-0092"
+  },
+  "category": "系統服務",
+  "title": "xinetd 套件",
+  "expected": "移除",
+  "doc_method": "執行 #dnf remove xinetd",
+  "version_diff": "",
+  "type": "package_absent",
+  "params": {
+   "pkg": "xinetd"
+  },
+  "check": "rpm -q xinetd；回傳非 0（未安裝）即符合。",
+  "fix": "修復前以 rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' xinetd 記錄版本，並以 dnf remove --assumeno xinetd 列出連帶移除的相依套件寫入備份紀錄；若有其他套件會被連帶移除則中止並回報。確認後執行 dnf -y remove xinetd。回滾：dnf -y install 記錄的套件版本（需可用的套件庫）。",
+  "risk": "A",
+  "risk_reason": "移除未使用的舊式超級伺服器套件，伺服器通常不依賴。",
+  "needs_reboot": false,
+  "applies_when": "一律（未安裝即符合）",
+  "existing": false,
+  "notes": "RHEL 9 官方套件庫已不提供 xinetd，RHEL 9／Rocky 9／Alma 9 通常直接符合。若主機仍由 xinetd 提供服務（例如 tftp、rsync 舊式設定），移除會中斷該服務。"
+ },
+ {
+  "key": "chrony_server",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0093",
+   "rhel9": "TWGCB-01-012-0093"
+  },
+  "category": "系統服務",
+  "title": "chrony 校時設定",
+  "expected": "設定 1 個以上校時來源",
+  "doc_method": "編輯 /etc/chrony.conf，新增或修改 NTP 伺服器設定：server (NTP 伺服器名稱) 或 pool (NTP 池名稱)",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "path": "/etc/chrony.conf",
+   "include_dirs": [
+    "/etc/chrony.d"
+   ],
+   "pattern": "^\\s*(server|pool)\\s+\\S+",
+   "min_count": 1
+  },
+  "check": "rpm -q chrony 須已安裝；解析 /etc/chrony.conf 及其 confdir/include 指向的檔案（RHEL 9 可能有 /etc/chrony.d/*.conf），忽略註解行，至少一行符合 ^\\s*(server|pool)\\s+\\S+ 即符合。輔助資訊（不影響判定）：chronyc -n sources 是否有可達來源、systemctl is-enabled chronyd。",
+  "fix": "無法自動修復：校時伺服器位址屬環境資訊，需由管理者提供。工具僅回報並提供指引；若管理者於設定中提供 NTP 位址，可將 server <位址> iburst 寫入 /etc/chrony.d/gcb-checker.conf（RHEL 8 需確認 chrony.conf 有 confdir/include，否則備份後附加至 /etc/chrony.conf），再 systemctl restart chronyd。回滾：還原 /etc/chrony.conf 備份或刪除該 drop-in 並重啟 chronyd。",
+  "risk": "C",
+  "risk_reason": "需要管理者提供校時伺服器位址等環境資訊。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL／Rocky／Alma 預設 chrony.conf 已含 pool 2.<發行版>.pool.ntp.org iburst，字面上即符合；但隔離網段的伺服器實際連不到公用池，建議在報告中提示改用機關內部 NTP。GCB 未要求 chronyd 必須啟用，但校時要生效需 chronyd 運作。"
+ },
+ {
+  "key": "rsyncd_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0094",
+   "rhel9": "TWGCB-01-012-0094"
+  },
+  "category": "系統服務",
+  "title": "rsyncd 服務",
+  "expected": "停用",
+  "doc_method": "執行 #systemctl --now mask rsyncd",
+  "version_diff": "",
+  "type": "service_disabled",
+  "params": {
+   "units": [
+    "rsyncd.service",
+    "rsyncd.socket"
+   ]
+  },
+  "check": "對 rsyncd.service、rsyncd.socket 逐一執行 systemctl list-unit-files 判斷單元是否存在；不存在（套件未安裝）視為符合。存在時以 systemctl is-enabled 須為 masked，且 systemctl is-active 不為 active 才符合。",
+  "fix": "修復前記錄每個單元原始狀態（is-enabled 與 is-active 結果）至備份檔；執行 systemctl --now mask rsyncd.service rsyncd.socket。回滾：systemctl unmask 後依原狀態 systemctl enable（若原為 enabled）與 systemctl start（若原為 active）。文件只遮蔽 rsyncd，但 rsync-daemon 套件另有 rsyncd.socket，一併遮蔽以免透過 socket 啟動。",
+  "risk": "B",
+  "risk_reason": "伺服器可能以 rsync daemon 提供備份或檔案同步，停用會中斷該服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 rsync-daemon（RHEL 8.3+／9 由 rsync-daemon 套件提供 rsyncd.service）",
+  "existing": false,
+  "notes": "RHEL 8 早期版本 rsyncd.service 由 rsync 套件提供，8.3 以後拆成 rsync-daemon。透過 SSH 執行的 rsync 不受此規則影響。建議修復前確認 ss -ltnp 是否有 873 埠監聽。"
+ },
+ {
+  "key": "avahi_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0095",
+   "rhel9": "TWGCB-01-012-0095"
+  },
+  "category": "系統服務",
+  "title": "avahi-daemon 服務",
+  "expected": "停用",
+  "doc_method": "執行 #systemctl --now mask avahi-daemon.service 與 #systemctl --now mask avahi-daemon.socket",
+  "version_diff": "",
+  "type": "service_disabled",
+  "params": {
+   "units": [
+    "avahi-daemon.service",
+    "avahi-daemon.socket"
+   ]
+  },
+  "check": "對 avahi-daemon.service、avahi-daemon.socket 逐一執行 systemctl list-unit-files 判斷單元是否存在；不存在（套件未安裝）視為符合。存在時以 systemctl is-enabled 須為 masked，且 systemctl is-active 不為 active 才符合。",
+  "fix": "修復前記錄每個單元原始狀態（is-enabled 與 is-active 結果）至備份檔；執行 systemctl --now mask avahi-daemon.socket avahi-daemon.service。回滾：systemctl unmask 後依原狀態 systemctl enable（若原為 enabled）與 systemctl start（若原為 active）。應先 mask socket 再 mask service，避免 socket 重新喚起服務。",
+  "risk": "A",
+  "risk_reason": "伺服器通常不需要 mDNS／zeroconf 服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 avahi",
+  "existing": true,
+  "notes": "已實作項目。"
+ },
+ {
+  "key": "snmpd_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0096",
+   "rhel9": "TWGCB-01-012-0096"
+  },
+  "category": "系統服務",
+  "title": "SNMP 服務",
+  "expected": "停用 SNMP 服務或僅啟用 SNMPv3 功能",
+  "doc_method": "(1) 停用：#systemctl --now mask snmpd；(2) 僅啟用 SNMPv3：#systemctl stop snmpd，#net-snmp-create-v3-user -ro -A (使用者密碼) -a SHA -X (傳輸加密用密碼) -x AES (使用者名稱)，編輯 /etc/snmp/snmpd.conf 將含 com2sec、group、view 及 access 參數之行註解（例：#com2sec notConfigUser default public、#group notConfigGroup v1 notConfigUser、#group notConfigGroup v2c notConfigUser、#view systemview included .1.3.6.1.2.1.1、#view systemview included .1.3.6.1.2.1.25.1.1、#access notConfigGroup \"\" any noauth exact systemview none none），再 #systemctl start snmpd",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "units": [
+    "snmpd.service"
+   ],
+   "conf": "/etc/snmp/snmpd.conf",
+   "v1v2_patterns": [
+    "^\\s*com2sec\\b",
+    "^\\s*com2sec6\\b",
+    "^\\s*rocommunity6?\\b",
+    "^\\s*rwcommunity6?\\b",
+    "^\\s*group\\s+\\S+\\s+(v1|v2c)\\b"
+   ]
+  },
+  "check": "snmpd.service 不存在（未安裝 net-snmp）即符合；若 is-enabled 為 masked 且未運作即符合；若 snmpd 運作中，檢查 /etc/snmp/snmpd.conf（及 includeFile／includeDir 引用檔）未註解行不得出現 com2sec、com2sec6、rocommunity、rwcommunity，且 group 行不得使用 v1 或 v2c 安全模型，同時須至少有一個 SNMPv3 使用者（/var/lib/net-snmp/snmpd.conf 有 usmUser 或 snmpd.conf 有 rouser／rwuser 行），符合即視為「僅 SNMPv3」。",
+  "fix": "不自動修復，僅回報：方案 (1) 停用時同 service_disabled 流程（記錄原狀態後 systemctl --now mask snmpd，回滾 unmask/enable/start）；方案 (2) 需建立 SNMPv3 帳號與密碼，屬人工作業，工具提供上述文件步驟。若管理者明確選擇方案 (1)，才可經確認後執行停用。",
+  "risk": "B",
+  "risk_reason": "伺服器常被監控系統以 SNMP 輪詢，停用或改 v3 會中斷監控，且 v3 需設定密碼。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 net-snmp（snmpd）",
+  "existing": false,
+  "notes": "net-snmp-create-v3-user 需在 snmpd 停止時執行。新版 net-snmp 支援 -a SHA-256／-x AES-256 等更強演算法，文件寫 SHA／AES 為最低要求。RHEL 9 文件用詞為「通行碼」「金鑰」，內容相同。"
+ },
+ {
+  "key": "squid_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0097",
+   "rhel9": "TWGCB-01-012-0097"
+  },
+  "category": "系統服務",
+  "title": "Squid 服務",
+  "expected": "停用",
+  "doc_method": "執行 #systemctl --now mask squid",
+  "version_diff": "",
+  "type": "service_disabled",
+  "params": {
+   "units": [
+    "squid.service"
+   ]
+  },
+  "check": "對 squid.service 逐一執行 systemctl list-unit-files 判斷單元是否存在；不存在（套件未安裝）視為符合。存在時以 systemctl is-enabled 須為 masked，且 systemctl is-active 不為 active 才符合。",
+  "fix": "修復前記錄每個單元原始狀態（is-enabled 與 is-active 結果）至備份檔；執行 systemctl --now mask squid.service。回滾：systemctl unmask 後依原狀態 systemctl enable（若原為 enabled）與 systemctl start（若原為 active）。",
+  "risk": "B",
+  "risk_reason": "若主機本身是代理伺服器，停用會中斷代理服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 squid",
+  "existing": false,
+  "notes": "修復前建議確認 ss -ltnp 是否有 3128 埠監聽並提示管理者。"
+ },
+ {
+  "key": "smb_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0098",
+   "rhel9": "TWGCB-01-012-0098"
+  },
+  "category": "系統服務",
+  "title": "Samba 服務",
+  "expected": "停用",
+  "doc_method": "執行 #systemctl --now mask smb",
+  "version_diff": "",
+  "type": "service_disabled",
+  "params": {
+   "units": [
+    "smb.service"
+   ]
+  },
+  "check": "對 smb.service 逐一執行 systemctl list-unit-files 判斷單元是否存在；不存在（套件未安裝）視為符合。存在時以 systemctl is-enabled 須為 masked，且 systemctl is-active 不為 active 才符合。",
+  "fix": "修復前記錄每個單元原始狀態（is-enabled 與 is-active 結果）至備份檔；執行 systemctl --now mask smb.service。回滾：systemctl unmask 後依原狀態 systemctl enable（若原為 enabled）與 systemctl start（若原為 active）。",
+  "risk": "B",
+  "risk_reason": "伺服器可能正以 Samba 提供檔案分享，停用會中斷分享。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 samba",
+  "existing": false,
+  "notes": "文件只要求 smb；nmb.service（NetBIOS 名稱服務）未列入，可在報告中提示但不納入判定。samba-client 等用戶端套件不受影響。"
+ },
+ {
+  "key": "vsftpd_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0099",
+   "rhel9": "TWGCB-01-012-0099"
+  },
+  "category": "系統服務",
+  "title": "FTP 伺服器",
+  "expected": "停用",
+  "doc_method": "執行 #systemctl --now mask vsftpd",
+  "version_diff": "",
+  "type": "service_disabled",
+  "params": {
+   "units": [
+    "vsftpd.service"
+   ]
+  },
+  "check": "對 vsftpd.service 逐一執行 systemctl list-unit-files 判斷單元是否存在；不存在（套件未安裝）視為符合。存在時以 systemctl is-enabled 須為 masked，且 systemctl is-active 不為 active 才符合。",
+  "fix": "修復前記錄每個單元原始狀態（is-enabled 與 is-active 結果）至備份檔；執行 systemctl --now mask vsftpd.service。回滾：systemctl unmask 後依原狀態 systemctl enable（若原為 enabled）與 systemctl start（若原為 active）。",
+  "risk": "B",
+  "risk_reason": "伺服器可能正提供 FTP 檔案傳輸，停用會中斷業務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 vsftpd",
+  "existing": false,
+  "notes": "文件只指名 vsftpd；若安裝其他 FTP 伺服器（如 proftpd、pure-ftpd，來自 EPEL）不在檢測範圍，可在報告中提示。建議改用 SFTP。"
+ },
+ {
+  "key": "ypserv_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0100",
+   "rhel9": "TWGCB-01-012-0100"
+  },
+  "category": "系統服務",
+  "title": "NIS 伺服器",
+  "expected": "停用",
+  "doc_method": "執行 #systemctl --now mask ypserv",
+  "version_diff": "",
+  "type": "service_disabled",
+  "params": {
+   "units": [
+    "ypserv.service"
+   ]
+  },
+  "check": "對 ypserv.service 逐一執行 systemctl list-unit-files 判斷單元是否存在；不存在（套件未安裝）視為符合。存在時以 systemctl is-enabled 須為 masked，且 systemctl is-active 不為 active 才符合。",
+  "fix": "修復前記錄每個單元原始狀態（is-enabled 與 is-active 結果）至備份檔；執行 systemctl --now mask ypserv.service。回滾：systemctl unmask 後依原狀態 systemctl enable（若原為 enabled）與 systemctl start（若原為 active）。",
+  "risk": "B",
+  "risk_reason": "若主機為 NIS 伺服器，停用會使所有 NIS 用戶端無法驗證登入。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 ypserv",
+  "existing": false,
+  "notes": "RHEL 9 已不提供 ypserv（NIS 已棄用），通常直接符合。"
+ },
+ {
+  "key": "kdump_enabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0101",
+   "rhel9": "TWGCB-01-012-0101"
+  },
+  "category": "系統服務",
+  "title": "kdump 服務",
+  "expected": "啟用",
+  "doc_method": "執行 #systemctl --now enable kdump.service",
+  "version_diff": "",
+  "type": "service_enabled",
+  "params": {
+   "unit": "kdump.service",
+   "pkg": "kexec-tools"
+  },
+  "check": "rpm -q kexec-tools 須已安裝；systemctl is-enabled kdump.service 為 enabled 且 systemctl is-active kdump.service 為 active 才符合。輔助：cat /sys/kernel/kexec_crash_size 大於 0 表示已保留 crashkernel 記憶體；為 0 時服務必定啟動失敗，報告中說明原因。",
+  "fix": "記錄原狀態後執行 systemctl --now enable kdump.service；若未安裝 kexec-tools 則中止並回報（安裝需套件庫，不自動安裝）。若 /sys/kernel/kexec_crash_size 為 0，不自動修改開機參數，回報需先設定 crashkernel（RHEL 8：grubby --update-kernel=ALL --args=crashkernel=auto；RHEL 9：kdumpctl reset-crashkernel --kernel=ALL）並重開機。回滾：依記錄 systemctl disable --now kdump.service。",
+  "risk": "B",
+  "risk_reason": "kdump 需保留 crashkernel 記憶體，未保留時需改開機參數並重開機才能啟用。",
+  "needs_reboot": false,
+  "applies_when": "一律（需已安裝 kexec-tools）",
+  "existing": false,
+  "notes": "RHEL 8 預設 crashkernel=auto；RHEL 9 已不支援 auto，改由 kdumpctl reset-crashkernel 設定固定值。小記憶體 VM（<2GB）常未保留 crashkernel。needs_reboot 填 false 指一般情況；若需設定 crashkernel 則需重開機。"
+ },
+ {
+  "key": "ypbind_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0102",
+   "rhel9": "TWGCB-01-012-0102"
+  },
+  "category": "安裝與維護軟體",
+  "title": "NIS 用戶端套件",
+  "expected": "移除",
+  "doc_method": "執行 #dnf remove ypbind",
+  "version_diff": "",
+  "type": "package_absent",
+  "params": {
+   "pkg": "ypbind"
+  },
+  "check": "rpm -q ypbind；回傳非 0（未安裝）即符合。",
+  "fix": "修復前以 rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' ypbind 記錄版本，並以 dnf remove --assumeno ypbind 列出連帶移除的相依套件寫入備份紀錄；若有其他套件會被連帶移除則中止並回報。確認後執行 dnf -y remove ypbind。回滾：dnf -y install 記錄的套件版本（需可用的套件庫）。移除前檢查 /etc/nsswitch.conf 是否含 nis 來源且 ypbind 服務運作中；若是，表示主機以 NIS 驗證帳號，中止並回報。",
+  "risk": "B",
+  "risk_reason": "若主機以 NIS 驗證帳號登入，移除會使 NIS 帳號無法登入。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 ypbind",
+  "existing": false,
+  "notes": "RHEL 9 已不提供 ypbind，通常直接符合。"
+ },
+ {
+  "key": "telnet_client_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0103",
+   "rhel9": "TWGCB-01-012-0103"
+  },
+  "category": "安裝與維護軟體",
+  "title": "telnet 用戶端套件",
+  "expected": "移除",
+  "doc_method": "執行 #dnf remove telnet",
+  "version_diff": "",
+  "type": "package_absent",
+  "params": {
+   "pkg": "telnet"
+  },
+  "check": "rpm -q telnet；回傳非 0（未安裝）即符合。",
+  "fix": "修復前以 rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' telnet 記錄版本，並以 dnf remove --assumeno telnet 列出連帶移除的相依套件寫入備份紀錄；若有其他套件會被連帶移除則中止並回報。確認後執行 dnf -y remove telnet。回滾：dnf -y install 記錄的套件版本（需可用的套件庫）。",
+  "risk": "A",
+  "risk_reason": "移除不安全的用戶端工具，不影響系統服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 telnet",
+  "existing": true,
+  "notes": "已實作項目。管理者常用 telnet 測試連接埠，可改用 nc（nmap-ncat）或 curl。"
+ },
+ {
+  "key": "telnet_server_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0104",
+   "rhel9": "TWGCB-01-012-0104"
+  },
+  "category": "安裝與維護軟體",
+  "title": "telnet 伺服器套件",
+  "expected": "移除",
+  "doc_method": "執行 #dnf remove telnet-server",
+  "version_diff": "",
+  "type": "package_absent",
+  "params": {
+   "pkg": "telnet-server"
+  },
+  "check": "rpm -q telnet-server；回傳非 0（未安裝）即符合。",
+  "fix": "修復前以 rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' telnet-server 記錄版本，並以 dnf remove --assumeno telnet-server 列出連帶移除的相依套件寫入備份紀錄；若有其他套件會被連帶移除則中止並回報。確認後執行 dnf -y remove telnet-server。回滾：dnf -y install 記錄的套件版本（需可用的套件庫）。移除前建議檢查 telnet.socket 是否運作中並於報告提示。",
+  "risk": "A",
+  "risk_reason": "移除不安全的明文遠端登入服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 telnet-server",
+  "existing": false,
+  "notes": "若管理者仍以 telnet 遠端管理主機，移除會中斷該連線方式，修復前應確認 SSH 可用。"
+ },
+ {
+  "key": "rsh_server_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0105",
+   "rhel9": "TWGCB-01-012-0105"
+  },
+  "category": "安裝與維護軟體",
+  "title": "rsh 伺服器套件",
+  "expected": "移除",
+  "doc_method": "執行 #dnf remove rsh-server",
+  "version_diff": "",
+  "type": "package_absent",
+  "params": {
+   "pkg": "rsh-server"
+  },
+  "check": "rpm -q rsh-server；回傳非 0（未安裝）即符合。",
+  "fix": "修復前以 rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' rsh-server 記錄版本，並以 dnf remove --assumeno rsh-server 列出連帶移除的相依套件寫入備份紀錄；若有其他套件會被連帶移除則中止並回報。確認後執行 dnf -y remove rsh-server。回滾：dnf -y install 記錄的套件版本（需可用的套件庫）。",
+  "risk": "A",
+  "risk_reason": "移除不安全的明文遠端存取服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 rsh-server",
+  "existing": false,
+  "notes": "RHEL 9 已不提供 rsh／rsh-server，通常直接符合。"
+ },
+ {
+  "key": "tftp_server_absent",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0106",
+   "rhel9": "TWGCB-01-012-0106"
+  },
+  "category": "安裝與維護軟體",
+  "title": "tftp 伺服器套件",
+  "expected": "移除",
+  "doc_method": "執行 #dnf remove tftp-server",
+  "version_diff": "",
+  "type": "package_absent",
+  "params": {
+   "pkg": "tftp-server"
+  },
+  "check": "rpm -q tftp-server；回傳非 0（未安裝）即符合。",
+  "fix": "修復前以 rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' tftp-server 記錄版本，並以 dnf remove --assumeno tftp-server 列出連帶移除的相依套件寫入備份紀錄；若有其他套件會被連帶移除則中止並回報。確認後執行 dnf -y remove tftp-server。回滾：dnf -y install 記錄的套件版本（需可用的套件庫）。移除前檢查 tftp.socket／tftp.service 是否運作中並提示管理者。",
+  "risk": "B",
+  "risk_reason": "PXE 開機或網路設備備份伺服器可能依賴 tftp，移除會中斷該服務。",
+  "needs_reboot": false,
+  "applies_when": "已安裝 tftp-server",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "dnf_clean_requirements",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0107",
+   "rhel9": "TWGCB-01-012-0107"
+  },
+  "category": "安裝與維護軟體",
+  "title": "更新套件後移除舊版本元件",
+  "expected": "True",
+  "doc_method": "編輯 /etc/yum.conf 與 /etc/dnf/dnf.conf，新增或修改：clean_requirements_on_remove=True",
+  "version_diff": "",
+  "type": "kv_config",
+  "params": {
+   "paths": [
+    "/etc/dnf/dnf.conf",
+    "/etc/yum.conf"
+   ],
+   "section": "main",
+   "key": "clean_requirements_on_remove",
+   "value": "True",
+   "compare": "in",
+   "accepted": [
+    "True",
+    "true",
+    "1",
+    "yes"
+   ],
+   "separator": "="
+  },
+  "check": "分別解析 /etc/dnf/dnf.conf 與 /etc/yum.conf（INI 格式）的 [main] 段落，clean_requirements_on_remove 值（不分大小寫）屬於 True／1／yes 才符合；兩檔皆須符合（若 /etc/yum.conf 是指向 dnf.conf 的符號連結，視為同一檔只檢一次）。",
+  "fix": "以 os.path.realpath 去重後，對每個實體檔案備份，於 [main] 段落內新增或取代 clean_requirements_on_remove=True（保留其他內容）；若 /etc/yum.conf 不存在則不建立。回滾：還原備份檔。",
+  "risk": "A",
+  "risk_reason": "僅變更套件管理器設定檔。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 8／9 的 /etc/yum.conf 通常是 dnf/dnf.conf 的符號連結。dnf 本身預設值即為 True，但 GCB 要求明確設定。此設定是移除套件時一併移除不再需要的相依套件，並非「移除舊版本」，文件說明與實際功能不完全相符。"
+ },
+ {
+  "key": "ip_forward",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0108",
+   "rhel9": "TWGCB-01-012-0108"
+  },
+  "category": "網路設定",
+  "title": "IP 轉送",
+  "expected": "0",
+  "doc_method": "以 grep -Els 尋找 /etc/sysctl.conf /etc/sysctl.d/*.conf /usr/lib/sysctl.d/*.conf /run/sysctl.d/*.conf 中 net.ipv4.ip_forward=1 與 net.ipv6.conf.all.forwarding=1 的行，用 sed 改為 # *REMOVED* 註解；sysctl -w net.ipv4.ip_forward=0；sysctl -w net.ipv4.route.flush=1；net.ipv4.ip_forward = 0 寫入 /etc/sysctl.d/60-netipv4_sysctl.conf；sysctl -w net.ipv6.conf.all.forwarding=0；sysctl -w net.ipv6.route.flush=1；net.ipv6.conf.all.forwarding = 0 寫入 /etc/sysctl.d/60-netipv6_sysctl.conf",
+  "version_diff": "",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.ip_forward",
+     "value": "0"
+    },
+    {
+     "key": "net.ipv6.conf.all.forwarding",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush",
+    "net.ipv6.route.flush"
+   ],
+   "ipv6_missing": "not_applicable"
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。 IPv6 停用處理：若 /proc/sys/net/ipv6 不存在（開機參數 ipv6.disable=1 或核心未載入 ipv6），net.ipv6.* 參數視為「不適用／符合」，且修復時不寫入 net.ipv6.* 行（否則 sysctl --system 會對不存在的 key 報錯）。僅以 net.ipv6.conf.all.disable_ipv6=1 停用時 key 仍存在，照常檢測與設定。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1；sysctl -w net.ipv6.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "B",
+  "risk_reason": "執行容器（podman／docker／Kubernetes）、libvirt 虛擬網路、VPN 或作路由的主機需要 IP 轉送，關閉會中斷其網路。",
+  "needs_reboot": false,
+  "applies_when": "一律（主機作為路由器或容器／虛擬化主機時需人工評估）",
+  "existing": true,
+  "notes": "已實作項目。文件做法會修改 /usr/lib/sysctl.d（套件擁有，更新會被覆蓋），工具改以 /etc/sysctl.d/60-gcb-checker.conf 統一寫入並只註解 /etc 與 /run 下的衝突行。修復前應偵測 podman／docker／libvirtd／kubelet 是否安裝或運作並警告。firewalld 不會自動開啟轉送，但 docker、libvirt 啟動時會將 ip_forward 設為 1，造成修復後執行值又變回 1。"
+ },
+ {
+  "key": "send_redirects_all",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0109",
+   "rhel9": "TWGCB-01-012-0109"
+  },
+  "category": "網路設定",
+  "title": "所有網路介面禁止傳送 ICMP 重新導向封包",
+  "expected": "0",
+  "doc_method": "於 /etc/sysctl.conf 或 /etc/sysctl.d/ 檔案設定 net.ipv4.conf.all.send_redirects = 0；#sysctl -w net.ipv4.conf.all.send_redirects=0；#sysctl -w net.ipv4.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「所有網路介面傳送 ICMP 重新導向封包」，RHEL 9 為「所有網路介面禁止傳送 ICMP 重新導向封包」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.all.send_redirects",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "主機非路由器時傳送重新導向無用途，關閉不影響連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": true,
+  "notes": "已實作項目。"
+ },
+ {
+  "key": "send_redirects_default",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0110",
+   "rhel9": "TWGCB-01-012-0110"
+  },
+  "category": "網路設定",
+  "title": "預設網路介面禁止傳送 ICMP 重新導向封包",
+  "expected": "0",
+  "doc_method": "於 /etc/sysctl.conf 或 /etc/sysctl.d/ 檔案設定 net.ipv4.conf.default.send_redirects = 0；#sysctl -w net.ipv4.conf.default.send_redirects=0；#sysctl -w net.ipv4.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「預設網路介面傳送 ICMP 重新導向封包」，RHEL 9 為「預設網路介面禁止傳送 ICMP 重新導向封包」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.default.send_redirects",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "主機非路由器時傳送重新導向無用途，關閉不影響連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": true,
+  "notes": "已實作項目。default 僅影響之後新建立的介面，既有介面由 all 控制。"
+ },
+ {
+  "key": "accept_source_route_all",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0111",
+   "rhel9": "TWGCB-01-012-0111"
+  },
+  "category": "網路設定",
+  "title": "所有網路介面阻擋來源路由封包",
+  "expected": "0",
+  "doc_method": "設定 net.ipv4.conf.all.accept_source_route = 0、net.ipv6.conf.all.accept_source_route = 0；sysctl -w 兩參數為 0；#sysctl -w net.ipv4.route.flush=1；#sysctl -w net.ipv6.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「所有網路介面接受來源路由封包」，RHEL 9 為「所有網路介面阻擋來源路由封包」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.all.accept_source_route",
+     "value": "0"
+    },
+    {
+     "key": "net.ipv6.conf.all.accept_source_route",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush",
+    "net.ipv6.route.flush"
+   ],
+   "ipv6_missing": "not_applicable"
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。 IPv6 停用處理：若 /proc/sys/net/ipv6 不存在（開機參數 ipv6.disable=1 或核心未載入 ipv6），net.ipv6.* 參數視為「不適用／符合」，且修復時不寫入 net.ipv6.* 行（否則 sysctl --system 會對不存在的 key 報錯）。僅以 net.ipv6.conf.all.disable_ipv6=1 停用時 key 仍存在，照常檢測與設定。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1；sysctl -w net.ipv6.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "一般網路不使用來源路由，阻擋不影響連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 預設值即為 0。"
+ },
+ {
+  "key": "accept_source_route_default",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0112",
+   "rhel9": "TWGCB-01-012-0112"
+  },
+  "category": "網路設定",
+  "title": "預設網路介面阻擋來源路由封包",
+  "expected": "0",
+  "doc_method": "設定 net.ipv4.conf.default.accept_source_route = 0、net.ipv6.conf.default.accept_source_route = 0；sysctl -w 兩參數為 0；#sysctl -w net.ipv4.route.flush=1；#sysctl -w net.ipv6.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「預設網路介面接受來源路由封包」，RHEL 9 為「預設網路介面阻擋來源路由封包」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.default.accept_source_route",
+     "value": "0"
+    },
+    {
+     "key": "net.ipv6.conf.default.accept_source_route",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush",
+    "net.ipv6.route.flush"
+   ],
+   "ipv6_missing": "not_applicable"
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。 IPv6 停用處理：若 /proc/sys/net/ipv6 不存在（開機參數 ipv6.disable=1 或核心未載入 ipv6），net.ipv6.* 參數視為「不適用／符合」，且修復時不寫入 net.ipv6.* 行（否則 sysctl --system 會對不存在的 key 報錯）。僅以 net.ipv6.conf.all.disable_ipv6=1 停用時 key 仍存在，照常檢測與設定。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1；sysctl -w net.ipv6.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "一般網路不使用來源路由，阻擋不影響連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "accept_redirects_all",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0113",
+   "rhel9": "TWGCB-01-012-0113"
+  },
+  "category": "網路設定",
+  "title": "所有網路介面阻擋 ICMP 重新導向封包",
+  "expected": "0",
+  "doc_method": "設定 net.ipv4.conf.all.accept_redirects = 0、net.ipv6.conf.all.accept_redirects = 0；sysctl -w 兩參數為 0；#sysctl -w net.ipv4.route.flush=1；#sysctl -w net.ipv6.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「所有網路介面接受 ICMP 重新導向封包」，RHEL 9 為「所有網路介面阻擋 ICMP 重新導向封包」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.all.accept_redirects",
+     "value": "0"
+    },
+    {
+     "key": "net.ipv6.conf.all.accept_redirects",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush",
+    "net.ipv6.route.flush"
+   ],
+   "ipv6_missing": "not_applicable"
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。 IPv6 停用處理：若 /proc/sys/net/ipv6 不存在（開機參數 ipv6.disable=1 或核心未載入 ipv6），net.ipv6.* 參數視為「不適用／符合」，且修復時不寫入 net.ipv6.* 行（否則 sysctl --system 會對不存在的 key 報錯）。僅以 net.ipv6.conf.all.disable_ipv6=1 停用時 key 仍存在，照常檢測與設定。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1；sysctl -w net.ipv6.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "主機以靜態／預設路由運作，拒收重新導向不影響正常連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "accept_redirects_default",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0114",
+   "rhel9": "TWGCB-01-012-0114"
+  },
+  "category": "網路設定",
+  "title": "預設網路介面阻擋 ICMP 重新導向封包",
+  "expected": "0",
+  "doc_method": "設定 net.ipv4.conf.default.accept_redirects = 0、net.ipv6.conf.default.accept_redirects = 0；sysctl -w 兩參數為 0；#sysctl -w net.ipv4.route.flush=1；#sysctl -w net.ipv6.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「預設網路介面接受 ICMP 重新導向封包」，RHEL 9 為「預設網路介面阻擋 ICMP 重新導向封包」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.default.accept_redirects",
+     "value": "0"
+    },
+    {
+     "key": "net.ipv6.conf.default.accept_redirects",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush",
+    "net.ipv6.route.flush"
+   ],
+   "ipv6_missing": "not_applicable"
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。 IPv6 停用處理：若 /proc/sys/net/ipv6 不存在（開機參數 ipv6.disable=1 或核心未載入 ipv6），net.ipv6.* 參數視為「不適用／符合」，且修復時不寫入 net.ipv6.* 行（否則 sysctl --system 會對不存在的 key 報錯）。僅以 net.ipv6.conf.all.disable_ipv6=1 停用時 key 仍存在，照常檢測與設定。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1；sysctl -w net.ipv6.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "主機以靜態／預設路由運作，拒收重新導向不影響正常連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "secure_redirects_all",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0115",
+   "rhel9": "TWGCB-01-012-0115"
+  },
+  "category": "網路設定",
+  "title": "所有網路介面阻擋安全之 ICMP 重新導向封包",
+  "expected": "0",
+  "doc_method": "設定 net.ipv4.conf.all.secure_redirects = 0；#sysctl -w net.ipv4.conf.all.secure_redirects=0；#sysctl -w net.ipv4.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「所有網路介面接受安全的 ICMP 重新導向封包」，RHEL 9 為「所有網路介面阻擋安全之 ICMP 重新導向封包」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.all.secure_redirects",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "拒收閘道器重新導向不影響正常連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "secure_redirects_default",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0116",
+   "rhel9": "TWGCB-01-012-0116"
+  },
+  "category": "網路設定",
+  "title": "預設網路介面阻擋安全之 ICMP 重新導向封包",
+  "expected": "0",
+  "doc_method": "設定 net.ipv4.conf.default.secure_redirects = 0；#sysctl -w net.ipv4.conf.default.secure_redirects=0；#sysctl -w net.ipv4.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「預設網路介面接受安全的 ICMP 重新導向封包」，RHEL 9 為「預設網路介面阻擋安全之 ICMP 重新導向封包」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.default.secure_redirects",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "拒收閘道器重新導向不影響正常連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "log_martians_all",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0117",
+   "rhel9": "TWGCB-01-012-0117"
+  },
+  "category": "網路設定",
+  "title": "所有網路介面記錄可疑封包",
+  "expected": "1",
+  "doc_method": "設定 net.ipv4.conf.all.log_martians = 1；#sysctl -w net.ipv4.conf.all.log_martians=1；#sysctl -w net.ipv4.route.flush=1",
+  "version_diff": "",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.all.log_martians",
+     "value": "1"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "只增加核心日誌，不影響連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "在網路雜訊多的環境可能產生大量核心日誌，核心有速率限制。"
+ },
+ {
+  "key": "log_martians_default",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0118",
+   "rhel9": "TWGCB-01-012-0118"
+  },
+  "category": "網路設定",
+  "title": "預設網路介面記錄可疑封包",
+  "expected": "1",
+  "doc_method": "設定 net.ipv4.conf.default.log_martians = 1；#sysctl -w net.ipv4.conf.default.log_martians=1；#sysctl -w net.ipv4.route.flush=1",
+  "version_diff": "",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.default.log_martians",
+     "value": "1"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "只增加核心日誌，不影響連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "icmp_echo_ignore_broadcasts",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0119",
+   "rhel9": "TWGCB-01-012-0119"
+  },
+  "category": "網路設定",
+  "title": "不回應 ICMP 廣播要求",
+  "expected": "1",
+  "doc_method": "以 grep -Els 尋找 /etc/sysctl.conf /etc/sysctl.d/*.conf /usr/lib/sysctl.d/*.conf /run/sysctl.d/*.conf 中 net.ipv4.icmp_echo_ignore_broadcasts=0 的行並以 sed 註解為 # *REMOVED*；sysctl -w net.ipv4.icmp_echo_ignore_broadcasts=1；sysctl -w net.ipv4.route.flush=1；net.ipv4.icmp_echo_ignore_broadcasts = 1 寫入 /etc/sysctl.d/60-netipv4_sysctl.conf",
+  "version_diff": "",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.icmp_echo_ignore_broadcasts",
+     "value": "1"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "不影響一般單播連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 預設值即為 1。文件做法會改 /usr/lib/sysctl.d，工具改為只寫 /etc/sysctl.d/60-gcb-checker.conf。"
+ },
+ {
+  "key": "icmp_ignore_bogus_error_responses",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0120",
+   "rhel9": "TWGCB-01-012-0120"
+  },
+  "category": "網路設定",
+  "title": "忽略偽造之 ICMP 錯誤訊息",
+  "expected": "1",
+  "doc_method": "以 grep -Els 尋找各 sysctl 設定檔中 net.ipv4.icmp_ignore_bogus_error_responses=0 的行並以 sed 註解；sysctl -w net.ipv4.icmp_ignore_bogus_error_responses=1；sysctl -w net.ipv4.route.flush=1；net.ipv4.icmp_ignore_bogus_error_responses = 1 寫入 /etc/sysctl.d/60-netipv4_sysctl.conf",
+  "version_diff": "",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.icmp_ignore_bogus_error_responses",
+     "value": "1"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "不影響正常連線。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 預設值即為 1。"
+ },
+ {
+  "key": "rp_filter_all",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0121",
+   "rhel9": "TWGCB-01-012-0121"
+  },
+  "category": "網路設定",
+  "title": "所有網路介面啟用逆向路徑過濾功能",
+  "expected": "1",
+  "doc_method": "以 grep -Els 尋找各 sysctl 設定檔中 net.ipv4.conf.all.rp_filter=0 的行並以 sed 註解；sysctl -w net.ipv4.conf.all.rp_filter=1；sysctl -w net.ipv4.route.flush=1；net.ipv4.conf.all.rp_filter = 1 寫入 /etc/sysctl.d/60-netipv4_sysctl.conf",
+  "version_diff": "",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.all.rp_filter",
+     "value": "1"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "B",
+  "risk_reason": "（實作改為 B 類，原分析為 A 類，以程式為準）RHEL 預設即為 1，一般單一路徑主機不受影響。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件 sed 指令有誤：樣式寫成 net\\.ipv4\\.net.ipv4.conf\\.all\\.rp_filter，永遠比對不到，無法註解衝突行，工具應自行處理。檢測只接受 1（嚴格模式）；設為 2（寬鬆）依 GCB 視為不符合。多網卡且非對稱路由（例如管理網與業務網各有閘道）的主機，嚴格模式可能丟棄合法封包，報告中應提示。核心取 all 與各介面值中較大者，介面值為 2 時實際為寬鬆模式，可在報告中附註。"
+ },
+ {
+  "key": "rp_filter_default",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0122",
+   "rhel9": "TWGCB-01-012-0122"
+  },
+  "category": "網路設定",
+  "title": "預設網路介面啟用逆向路徑過濾功能",
+  "expected": "1",
+  "doc_method": "設定 net.ipv4.conf.default.rp_filter=1；#sysctl -w net.ipv4.conf.default.rp_filter=1；#sysctl -w net.ipv4.route.flush=1",
+  "version_diff": "",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.conf.default.rp_filter",
+     "value": "1"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "B",
+  "risk_reason": "（實作改為 B 類，原分析為 A 類，以程式為準）RHEL 預設即為 1，一般單一路徑主機不受影響。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": ""
+ },
+ {
+  "key": "tcp_syncookies",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0123",
+   "rhel9": "TWGCB-01-012-0123"
+  },
+  "category": "網路設定",
+  "title": "TCP SYN cookies",
+  "expected": "1",
+  "doc_method": "以 grep -Els 尋找各 sysctl 設定檔中 net.ipv4.tcp_syncookies 設為非 1 的行並以 sed 註解；sysctl -w net.ipv4.tcp_syncookies=1；sysctl -w net.ipv4.route.flush=1；net.ipv4.tcp_syncookies = 1 寫入 /etc/sysctl.d/60-netipv4_sysctl.conf",
+  "version_diff": "",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv4.tcp_syncookies",
+     "value": "1"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv4.route.flush"
+   ]
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv4.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "A",
+  "risk_reason": "RHEL 預設即為 1，只在 SYN 佇列滿時生效。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件 grep 樣式 \\s*[02]* 中的 * 允許零次，實際會比對到所有 tcp_syncookies 行（含已為 1 者）並全部註解，工具改為只註解值不等於 1 的行。檢測只接受 1（值 2 為一律送 cookie，依 GCB 不符合）。"
+ },
+ {
+  "key": "accept_ra_all",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0124",
+   "rhel9": "TWGCB-01-012-0124"
+  },
+  "category": "網路設定",
+  "title": "所有網路介面阻擋 IPv6 路由器公告訊息",
+  "expected": "0",
+  "doc_method": "設定 net.ipv6.conf.all.accept_ra = 0；#sysctl -w net.ipv6.conf.all.accept_ra=0；#sysctl -w net.ipv6.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「所有網路介面接受 IPv6 路由器公告訊息」，RHEL 9 為「所有網路介面阻擋 IPv6 路由器公告訊息」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv6.conf.all.accept_ra",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv6.route.flush"
+   ],
+   "ipv6_missing": "not_applicable"
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。 IPv6 停用處理：若 /proc/sys/net/ipv6 不存在（開機參數 ipv6.disable=1 或核心未載入 ipv6），net.ipv6.* 參數視為「不適用／符合」，且修復時不寫入 net.ipv6.* 行（否則 sysctl --system 會對不存在的 key 報錯）。僅以 net.ipv6.conf.all.disable_ipv6=1 停用時 key 仍存在，照常檢測與設定。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv6.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "B",
+  "risk_reason": "以 SLAAC／RA 取得 IPv6 位址或預設路由的主機會失去 IPv6 連線。",
+  "needs_reboot": false,
+  "applies_when": "IPv6 啟用時（IPv6 已停用則不適用）",
+  "existing": false,
+  "notes": "核心中 all.accept_ra 不會套用到既有介面，實際生效看各介面值；NetworkManager 管理的介面會自行處理 RA（核心介面值為 0 而由 NM 在使用者空間處理），因此僅設 sysctl 不一定能阻擋 RA。若需真正阻擋，應以 nmcli connection modify <連線> ipv6.method manual／disabled 調整，屬人工判斷。修復前應檢查 ip -6 route 是否有 proto ra 的預設路由並警告。"
+ },
+ {
+  "key": "accept_ra_default",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0125",
+   "rhel9": "TWGCB-01-012-0125"
+  },
+  "category": "網路設定",
+  "title": "預設網路介面阻擋 IPv6 路由器公告訊息",
+  "expected": "0",
+  "doc_method": "設定 net.ipv6.conf.default.accept_ra = 0；#sysctl -w net.ipv6.conf.default.accept_ra=0；#sysctl -w net.ipv6.route.flush=1",
+  "version_diff": "標題：RHEL 8 為「預設網路介面接受 IPv6 路由器公告訊息」，RHEL 9 為「預設網路介面阻擋 IPv6 路由器公告訊息」，設定相同。",
+  "type": "sysctl",
+  "params": {
+   "settings": [
+    {
+     "key": "net.ipv6.conf.default.accept_ra",
+     "value": "0"
+    }
+   ],
+   "conf_file": "/etc/sysctl.d/60-gcb-checker.conf",
+   "flush": [
+    "net.ipv6.route.flush"
+   ],
+   "ipv6_missing": "not_applicable"
+  },
+  "check": "對每個 key：(1) 執行值：讀 /proc/sys/<key 以 / 取代 .>（或 sysctl -n key）須等於期望值；(2) 持久設定：依 systemd-sysctl 規則（/etc/sysctl.d、/run/sysctl.d、/usr/lib/sysctl.d 依檔名排序合併，同名檔案 /etc 優先，/etc/sysctl.conf 最後）計算最終生效值，須等於期望值。兩者皆符合才算符合。 IPv6 停用處理：若 /proc/sys/net/ipv6 不存在（開機參數 ipv6.disable=1 或核心未載入 ipv6），net.ipv6.* 參數視為「不適用／符合」，且修復時不寫入 net.ipv6.* 行（否則 sysctl --system 會對不存在的 key 報錯）。僅以 net.ipv6.conf.all.disable_ipv6=1 停用時 key 仍存在，照常檢測與設定。",
+  "fix": "將參數寫入 /etc/sysctl.d/60-gcb-checker.conf（修改前備份該檔）；掃描 /etc/sysctl.conf、/etc/sysctl.d/*.conf、/run/sysctl.d/*.conf 中同一 key 但值不同的設定行，備份原檔後在行首加註解（# GCB-checker disabled:）；/usr/lib/sysctl.d/*.conf 不修改，若其中有衝突值，於 /etc/sysctl.d/ 建立同名檔案覆寫或確保 60-gcb-checker.conf 排序在其後生效並回報。接著 sysctl -w 套用執行值，最後執行 sysctl -w net.ipv6.route.flush=1（route.flush 為唯寫參數，不需持久化）。回滾：還原所有備份檔、刪除 60-gcb-checker.conf 中本條目，並以備份的原始執行值 sysctl -w 還原。",
+  "risk": "B",
+  "risk_reason": "新建立的介面將無法透過 RA 自動取得 IPv6 位址與路由。",
+  "needs_reboot": false,
+  "applies_when": "IPv6 啟用時（IPv6 已停用則不適用）",
+  "existing": false,
+  "notes": "同 accept_ra_all 的 NetworkManager 注意事項。"
+ },
+ {
+  "key": "dccp_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0126",
+   "rhel9": "TWGCB-01-012-0126"
+  },
+  "category": "網路設定",
+  "title": "DCCP 協定",
+  "expected": "停用",
+  "doc_method": "新增或編輯 /etc/modprobe.d/dccp.conf，加入：install dccp /bin/true 與 blacklist dccp；完成後重新開機",
+  "version_diff": "",
+  "type": "module_disabled",
+  "params": {
+   "module": "dccp",
+   "conf": "/etc/modprobe.d/dccp.conf",
+   "install_cmd": "/bin/true"
+  },
+  "check": "(1) modprobe -n -v dccp 輸出須為 install /bin/true（或 /bin/false）；若輸出 FATAL: Module dccp not found（未安裝 kernel-modules-extra）亦視為符合但仍建議寫入設定；(2) 解析 /etc/modprobe.d/*.conf、/run/modprobe.d/*.conf、/usr/lib/modprobe.d/*.conf 須有 blacklist dccp；(3) lsmod（或 /proc/modules）中不得有 dccp。三項皆符合才算符合。",
+  "fix": "備份既有 /etc/modprobe.d/dccp.conf（若存在）後寫入 install dccp /bin/true 與 blacklist dccp；若模組已載入，嘗試 modprobe -r dccp，失敗（使用中）則回報需重開機。回滾：還原或刪除該檔；若原本已載入，modprobe dccp 重新載入。",
+  "risk": "A",
+  "risk_reason": "伺服器幾乎不使用 DCCP，停用不影響一般服務。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件要求重新開機，實務上模組未載入時寫入設定即可生效，已載入且可卸載時亦不需重開機。RHEL 8/9 dccp 模組位於 kernel-modules-extra，多數系統未安裝即不存在。"
+ },
+ {
+  "key": "sctp_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0127",
+   "rhel9": "TWGCB-01-012-0127"
+  },
+  "category": "網路設定",
+  "title": "SCTP 協定",
+  "expected": "停用",
+  "doc_method": "新增或編輯 /etc/modprobe.d/sctp.conf，加入：install sctp /bin/true 與 blacklist sctp；完成後重新開機",
+  "version_diff": "",
+  "type": "module_disabled",
+  "params": {
+   "module": "sctp",
+   "conf": "/etc/modprobe.d/sctp.conf",
+   "install_cmd": "/bin/true"
+  },
+  "check": "(1) modprobe -n -v sctp 輸出須為 install /bin/true（或 /bin/false）；若輸出 FATAL: Module sctp not found（未安裝 kernel-modules-extra）亦視為符合但仍建議寫入設定；(2) 解析 /etc/modprobe.d/*.conf、/run/modprobe.d/*.conf、/usr/lib/modprobe.d/*.conf 須有 blacklist sctp；(3) lsmod（或 /proc/modules）中不得有 sctp。三項皆符合才算符合。",
+  "fix": "備份既有 /etc/modprobe.d/sctp.conf（若存在）後寫入 install sctp /bin/true 與 blacklist sctp；若模組已載入，嘗試 modprobe -r sctp，失敗（使用中）則回報需重開機。回滾：還原或刪除該檔；若原本已載入，modprobe sctp 重新載入。",
+  "risk": "A",
+  "risk_reason": "一般伺服器不使用 SCTP；電信或特定叢集軟體除外。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "電信（Diameter、SIGTRAN）、部分資料庫叢集或 Kubernetes SCTP 服務會使用 SCTP，修復前應確認 lsmod 中 sctp 使用計數為 0。RHEL 8/9 sctp 位於 kernel-modules-extra。"
+ },
+ {
+  "key": "rds_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0128",
+   "rhel9": "TWGCB-01-012-0128"
+  },
+  "category": "網路設定",
+  "title": "RDS 協定",
+  "expected": "停用",
+  "doc_method": "新增或編輯 /etc/modprobe.d/rds.conf，加入：install rds /bin/true 與 blacklist rds；完成後重新開機",
+  "version_diff": "",
+  "type": "module_disabled",
+  "params": {
+   "module": "rds",
+   "conf": "/etc/modprobe.d/rds.conf",
+   "install_cmd": "/bin/true"
+  },
+  "check": "(1) modprobe -n -v rds 輸出須為 install /bin/true（或 /bin/false）；若輸出 FATAL: Module rds not found（未安裝 kernel-modules-extra）亦視為符合但仍建議寫入設定；(2) 解析 /etc/modprobe.d/*.conf、/run/modprobe.d/*.conf、/usr/lib/modprobe.d/*.conf 須有 blacklist rds；(3) lsmod（或 /proc/modules）中不得有 rds。三項皆符合才算符合。",
+  "fix": "備份既有 /etc/modprobe.d/rds.conf（若存在）後寫入 install rds /bin/true 與 blacklist rds；若模組已載入，嘗試 modprobe -r rds，失敗（使用中）則回報需重開機。回滾：還原或刪除該檔；若原本已載入，modprobe rds 重新載入。",
+  "risk": "A",
+  "risk_reason": "一般伺服器不使用 RDS，主要用於 Oracle RAC／InfiniBand 叢集。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件描述 RDS「應用在 VoIP 網路電話」有誤，RDS 主要用於 Oracle 叢集節點間通訊。Oracle RAC 主機須排除。"
+ },
+ {
+  "key": "tipc_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0129",
+   "rhel9": "TWGCB-01-012-0129"
+  },
+  "category": "網路設定",
+  "title": "TIPC 協定",
+  "expected": "停用",
+  "doc_method": "新增或編輯 /etc/modprobe.d/tipc.conf，加入：install tipc /bin/true 與 blacklist tipc；完成後重新開機",
+  "version_diff": "",
+  "type": "module_disabled",
+  "params": {
+   "module": "tipc",
+   "conf": "/etc/modprobe.d/tipc.conf",
+   "install_cmd": "/bin/true"
+  },
+  "check": "(1) modprobe -n -v tipc 輸出須為 install /bin/true（或 /bin/false）；若輸出 FATAL: Module tipc not found（未安裝 kernel-modules-extra）亦視為符合但仍建議寫入設定；(2) 解析 /etc/modprobe.d/*.conf、/run/modprobe.d/*.conf、/usr/lib/modprobe.d/*.conf 須有 blacklist tipc；(3) lsmod（或 /proc/modules）中不得有 tipc。三項皆符合才算符合。",
+  "fix": "備份既有 /etc/modprobe.d/tipc.conf（若存在）後寫入 install tipc /bin/true 與 blacklist tipc；若模組已載入，嘗試 modprobe -r tipc，失敗（使用中）則回報需重開機。回滾：還原或刪除該檔；若原本已載入，modprobe tipc 重新載入。",
+  "risk": "A",
+  "risk_reason": "一般伺服器不使用 TIPC 叢集通訊協定。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "RHEL 8/9 tipc 位於 kernel-modules-extra。"
+ },
+ {
+  "key": "wireless_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0130",
+   "rhel9": "TWGCB-01-012-0130"
+  },
+  "category": "網路設定",
+  "title": "無線網路介面",
+  "expected": "停用",
+  "doc_method": "若已安裝 nmcli：#nmcli radio all off；若未安裝 nmcli：以腳本 find /sys/class/net/*/ -type d -name wireless 找出無線介面的驅動模組，對每個模組寫入 install <模組> /bin/true 與 blacklist <模組> 至 /etc/modprobe.d/disable_wireless.conf",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "sysfs_glob": "/sys/class/net/*/wireless",
+   "nmcli_cmd": "nmcli radio all off",
+   "modprobe_conf": "/etc/modprobe.d/disable_wireless.conf"
+  },
+  "check": "列出 /sys/class/net/*/wireless 目錄；不存在任何無線介面即符合（伺服器常見情況）。若存在：有 nmcli 且 NetworkManager 運作時，nmcli radio wifi 與 nmcli radio wwan 皆須為 disabled；否則每個無線介面的驅動模組（readlink -f /sys/class/net/<if>/device/driver/module 的 basename）須在 modprobe 設定中有 install <模組> /bin/true 與 blacklist <模組>。",
+  "fix": "無無線介面則無需修復。有無線介面時：先確認目前預設路由與 SSH 連線不是經由該無線介面（ip route get <SSH 來源 IP>），若是則中止並回報。有 nmcli：記錄 nmcli radio all 原狀態後執行 nmcli radio all off，回滾以 nmcli radio wifi／wwan on 還原。無 nmcli：備份後寫入 /etc/modprobe.d/disable_wireless.conf，回滾刪除該檔（模組需重開機或手動 modprobe 恢復）。",
+  "risk": "B",
+  "risk_reason": "若主機透過無線網路連線，停用會中斷網路。",
+  "needs_reboot": false,
+  "applies_when": "存在無線網路介面時",
+  "existing": false,
+  "notes": "文件腳本以 xargs -0 dirname 處理以換行分隔的 find 結果，有多個無線介面時會出錯，工具應以 Python 逐一處理。nmcli radio all off 為持久設定（NetworkManager 會記住），模組黑名單需重開機才完全生效。"
+ },
+ {
+  "key": "promisc_disabled",
+  "ids": {
+   "rhel8": "TWGCB-01-008-0131",
+   "rhel9": "TWGCB-01-012-0131"
+  },
+  "category": "網路設定",
+  "title": "網路介面混雜模式",
+  "expected": "停用",
+  "doc_method": "#ip link | grep -i promisc 檢查；若有介面處於混雜模式，執行 #ip link set dev (網路介面裝置名稱) multicast off promisc off",
+  "version_diff": "",
+  "type": "custom",
+  "params": {
+   "cmd_check": "ip -o link show",
+   "flag": "PROMISC"
+  },
+  "check": "解析 ip -o link show（或讀 /sys/class/net/<if>/flags 判斷 IFF_PROMISC 0x100 位元）；沒有任何介面帶 PROMISC 旗標即符合。報告中列出處於混雜模式的介面，並標註是否為橋接器成員（/sys/class/net/<if>/brport 存在）、bond／team 成員或 veth。",
+  "fix": "不自動修復，僅回報。管理者確認後可執行 ip link set dev <介面> promisc off（只關閉混雜模式，不採用文件中的 multicast off）。此變更不持久，回滾：ip link set dev <介面> promisc on。",
+  "risk": "C",
+  "risk_reason": "混雜模式常由橋接器、虛擬化／容器網路、IDS 或 tcpdump 合法使用，需人工判斷用途。",
+  "needs_reboot": false,
+  "applies_when": "一律",
+  "existing": false,
+  "notes": "文件指令同時執行 multicast off，會關閉介面的多播，導致 IPv6 鄰居探索、VRRP／keepalived、多播服務失效，不應照做。加入 Linux bridge 的實體網卡會被核心設為混雜模式，屬正常行為，強制關閉會中斷橋接上的 VM／容器網路。混雜模式若由程式（如 tcpdump）開啟，程式結束後會自行恢復。"
+ }
+]

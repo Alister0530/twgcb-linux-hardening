@@ -1,0 +1,450 @@
+[
+  {
+    "id": "TWGCB-01-014-0112",
+    "category": "日誌與稽核",
+    "title": "auditd 套件",
+    "expected": "安裝",
+    "doc_method": "開啟終端機執行：#apt install auditd audispd-plugins",
+    "type": "package_present",
+    "params": {
+      "pkg": [
+        "auditd",
+        "audispd-plugins"
+      ]
+    },
+    "check": "執行 dpkg-query -W -f='${Status}' auditd 與 audispd-plugins，兩者皆為 install ok installed 才合格。",
+    "fix": "執行 DEBIAN_FRONTEND=noninteractive apt-get install -y auditd audispd-plugins；記錄修復前未安裝的套件清單，回滾時以 apt-get remove 移除本次新安裝的套件（不 purge）。",
+    "risk": "A",
+    "risk_reason": "安裝稽核套件不影響既有服務，可安全回滾。",
+    "needs_reboot": false,
+    "applies_when": "一律",
+    "notes": "需可連線至套件來源（離線環境會失敗）。Ubuntu 22.04 仍提供 audispd-plugins 套件名稱。安裝 auditd 後會自動啟用並啟動服務。"
+  },
+  {
+    "id": "TWGCB-01-014-0113",
+    "category": "日誌與稽核",
+    "title": "auditd 服務",
+    "expected": "啟用",
+    "doc_method": "開啟終端機執行：#systemctl --now enable auditd",
+    "type": "service_enabled",
+    "params": {
+      "unit": "auditd",
+      "pkg": "auditd"
+    },
+    "check": "systemctl is-enabled auditd 為 enabled，且 systemctl is-active auditd 為 active 才合格。",
+    "fix": "systemctl --now enable auditd；備份/記錄原 enabled 與 active 狀態，回滾時還原。",
+    "risk": "A",
+    "risk_reason": "啟用稽核服務不影響其他服務運作。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "已實作。auditd.service 設有 RefuseManualStop=yes，回滾停止服務時需使用 service auditd stop 而非 systemctl stop。"
+  },
+  {
+    "id": "TWGCB-01-014-0114",
+    "category": "日誌與稽核",
+    "title": "稽核 auditd 服務啟動前之程序",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/default/grub，在 GRUB_CMDLINE_LINUX 加入「audit=1」，例：GRUB_CMDLINE_LINUX=\"audit=1\"；執行 #update-grub",
+    "type": "grub_arg",
+    "params": {
+      "arg": "audit=1"
+    },
+    "check": "/proc/cmdline 含 audit=1（目前生效），且 /etc/default/grub 或 /etc/default/grub.d/*.cfg 的 GRUB_CMDLINE_LINUX 含 audit=1（下次開機生效）。",
+    "fix": "新增 drop-in /etc/default/grub.d/99-gcb-audit.cfg：GRUB_CMDLINE_LINUX=\"$GRUB_CMDLINE_LINUX audit=1\"，執行 update-grub；備份 /boot/grub/grub.cfg，回滾時刪除 drop-in 並重新 update-grub。",
+    "risk": "B",
+    "risk_reason": "修改開機參數需重開機生效，且錯誤可能影響開機。",
+    "needs_reboot": true,
+    "applies_when": "一律（使用 GRUB 開機的系統）",
+    "notes": "已實作。雲端映像檔可能有 /etc/default/grub.d/50-cloudimg-settings.cfg 覆寫 GRUB_CMDLINE_LINUX，drop-in 需以 $GRUB_CMDLINE_LINUX 附加並以較大序號命名。"
+  },
+  {
+    "id": "TWGCB-01-014-0115",
+    "category": "日誌與稽核",
+    "title": "稽核待辦事項數量限制",
+    "expected": "8,192 以上",
+    "doc_method": "編輯 /etc/default/grub，在 GRUB_CMDLINE_LINUX 加入「audit_backlog_limit=(BACKLOG SIZE)」，BACKLOG SIZE 設為 8,192 以上，例：GRUB_CMDLINE_LINUX=\"audit_backlog_limit=8192\"；執行 #update-grub",
+    "type": "grub_arg",
+    "params": {
+      "arg": "audit_backlog_limit=8192",
+      "compare": "ge",
+      "key": "audit_backlog_limit",
+      "value": 8192
+    },
+    "check": "解析 /proc/cmdline 取 audit_backlog_limit 數值需 >= 8192（目前生效）；並解析 /etc/default/grub 與 /etc/default/grub.d/*.cfg（依載入順序，後者覆寫）中的 GRUB_CMDLINE_LINUX，其 audit_backlog_limit 需 >= 8192（下次開機生效）。",
+    "fix": "新增 drop-in /etc/default/grub.d/99-gcb-audit-backlog.cfg：GRUB_CMDLINE_LINUX=\"$GRUB_CMDLINE_LINUX audit_backlog_limit=8192\"，執行 update-grub；備份 /boot/grub/grub.cfg。回滾時刪除 drop-in 並重新 update-grub。",
+    "risk": "B",
+    "risk_reason": "修改開機參數需重開機才生效。",
+    "needs_reboot": true,
+    "applies_when": "一律（使用 GRUB 開機的系統）",
+    "notes": "grub_arg 需支援數值比較（ge），不能只比對字串 audit_backlog_limit=8192。若原本已有較小值，需以新值覆蓋（核心以最後出現者為準，附加於尾端即可）。文件範例會覆寫整個 GRUB_CMDLINE_LINUX，實作應改用附加方式。"
+  },
+  {
+    "id": "TWGCB-01-014-0116",
+    "category": "日誌與稽核",
+    "title": "稽核日誌檔案所有權",
+    "expected": "root:root",
+    "doc_method": "#grep -iw log_file /etc/audit/auditd.conf 尋找稽核日誌檔案；#chown root:root (稽核日誌檔案名稱)，例：#chown root:root /var/log/audit/audit.log",
+    "type": "file_perm",
+    "params": {
+      "path": "<auditd.conf 的 log_file，預設 /var/log/audit/audit.log，含輪替檔 audit.log.*>",
+      "owner": "root",
+      "group": "root"
+    },
+    "check": "解析 /etc/audit/auditd.conf 的 log_file（未設定則用 /var/log/audit/audit.log），對該檔及同目錄 <檔名>.* 輪替檔以 os.stat 檢查 uid=0 且 gid=0。",
+    "fix": "記錄每個檔案原 uid/gid 後 os.chown(path,0,0)；回滾時還原原擁有者與群組。建議一併將 auditd.conf 的 log_group 設為 root（先備份 auditd.conf）並重新載入 auditd，避免被還原。",
+    "risk": "A",
+    "risk_reason": "僅變更日誌檔擁有者，不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "Ubuntu 22.04 預設 /etc/audit/auditd.conf 為 log_group = adm，auditd 會依此設定日誌檔群組與權限（log_group 非 root 時建立檔案為 0640），單純 chown/chmod 會在 auditd 重啟或輪替後被還原；建議修復時一併將 auditd.conf 的 log_group 設為 root（並備份 auditd.conf），或在檢測時接受此情況並註記。"
+  },
+  {
+    "id": "TWGCB-01-014-0117",
+    "category": "日誌與稽核",
+    "title": "稽核日誌檔案權限",
+    "expected": "600 或更低權限",
+    "doc_method": "#grep -iw log_file /etc/audit/auditd.conf 尋找稽核日誌檔案；#chmod 600 (稽核日誌檔案名稱)，例：#chmod 600 /var/log/audit/audit.log",
+    "type": "file_perm",
+    "params": {
+      "path": "<auditd.conf 的 log_file，預設 /var/log/audit/audit.log，含輪替檔 audit.log.*>",
+      "max_mode": "0600"
+    },
+    "check": "解析 log_file 路徑，對該檔及輪替檔檢查 (st_mode & 0o777) & ~0o600 == 0。",
+    "fix": "記錄原權限後 chmod 移除超出 0600 的位元（mode & 0o600）；回滾時還原原權限。建議一併將 auditd.conf 的 log_group 設為 root。",
+    "risk": "A",
+    "risk_reason": "僅收緊日誌檔權限，不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "Ubuntu 22.04 預設 /etc/audit/auditd.conf 為 log_group = adm，auditd 會依此設定日誌檔群組與權限（log_group 非 root 時建立檔案為 0640），單純 chown/chmod 會在 auditd 重啟或輪替後被還原；建議修復時一併將 auditd.conf 的 log_group 設為 root（並備份 auditd.conf），或在檢測時接受此情況並註記。 收緊後 adm 群組成員將無法讀取稽核日誌。"
+  },
+  {
+    "id": "TWGCB-01-014-0118",
+    "category": "日誌與稽核",
+    "title": "稽核日誌目錄所有權",
+    "expected": "root:root",
+    "doc_method": "#grep -iw log_file /etc/audit/auditd.conf 尋找稽核日誌目錄；#chown root:root (稽核日誌目錄名稱)，例：#chown root:root /var/log/audit",
+    "type": "file_perm",
+    "params": {
+      "path": "<dirname(log_file)，預設 /var/log/audit>",
+      "owner": "root",
+      "group": "root"
+    },
+    "check": "取 log_file 所在目錄（預設 /var/log/audit），os.stat 檢查 uid=0 且 gid=0。",
+    "fix": "記錄原 uid/gid 後 os.chown(dir,0,0)；回滾時還原。",
+    "risk": "A",
+    "risk_reason": "僅變更目錄擁有者，不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0119",
+    "category": "日誌與稽核",
+    "title": "稽核日誌目錄權限",
+    "expected": "700 或更低權限",
+    "doc_method": "#grep -iw log_file /etc/audit/auditd.conf 尋找稽核日誌目錄；#chmod 700 (稽核日誌目錄名稱)，例：#chmod 700 /var/log/audit",
+    "type": "file_perm",
+    "params": {
+      "path": "<dirname(log_file)，預設 /var/log/audit>",
+      "max_mode": "0700"
+    },
+    "check": "取 log_file 所在目錄，檢查 (st_mode & 0o777) & ~0o700 == 0。",
+    "fix": "記錄原權限後 chmod 為 mode & 0o700；回滾時還原。",
+    "risk": "A",
+    "risk_reason": "僅收緊目錄權限，不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "Ubuntu 22.04 預設 /var/log/audit 可能為 0750 root:adm（對應 log_group=adm），收緊後 adm 群組無法讀取。"
+  },
+  {
+    "id": "TWGCB-01-014-0120",
+    "category": "日誌與稽核",
+    "title": "稽核規則檔案所有權",
+    "expected": "root:root",
+    "doc_method": "#chown root:root /etc/audit/rules.d/*.rules",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/audit/rules.d/*.rules",
+      "owner": "root",
+      "group": "root"
+    },
+    "check": "glob /etc/audit/rules.d/*.rules，每個檔案 uid=0 且 gid=0 才合格（無檔案視為合格）。",
+    "fix": "逐檔記錄原 uid/gid 後 chown root:root；回滾時還原。",
+    "risk": "A",
+    "risk_reason": "僅變更設定檔擁有者。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "文件僅涵蓋 rules.d/*.rules，未涵蓋 /etc/audit/audit.rules（augenrules 產生），可視需要一併檢查。本工具自行新增的 rules 檔也必須符合此規則。"
+  },
+  {
+    "id": "TWGCB-01-014-0121",
+    "category": "日誌與稽核",
+    "title": "稽核規則檔案權限",
+    "expected": "600 或更低權限",
+    "doc_method": "#chmod 600 /etc/audit/rules.d/*.rules",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/audit/rules.d/*.rules",
+      "max_mode": "0600"
+    },
+    "check": "glob /etc/audit/rules.d/*.rules，每個檔案 (mode & 0o777) & ~0o600 == 0。",
+    "fix": "逐檔記錄原權限後 chmod 為 mode & 0o600；回滾時還原。",
+    "risk": "A",
+    "risk_reason": "僅收緊設定檔權限。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "Ubuntu 預設 rules.d/audit.rules 為 0640。本工具新增的 rules 檔應直接以 0600 建立。"
+  },
+  {
+    "id": "TWGCB-01-014-0122",
+    "category": "日誌與稽核",
+    "title": "稽核設定檔案所有權",
+    "expected": "root:root",
+    "doc_method": "#chown root:root /etc/audit/auditd.conf",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/audit/auditd.conf",
+      "owner": "root",
+      "group": "root"
+    },
+    "check": "os.stat('/etc/audit/auditd.conf') uid=0 且 gid=0。",
+    "fix": "記錄原 uid/gid 後 chown root:root；回滾時還原。",
+    "risk": "A",
+    "risk_reason": "僅變更設定檔擁有者。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0123",
+    "category": "日誌與稽核",
+    "title": "稽核設定檔案權限",
+    "expected": "640 或更低權限",
+    "doc_method": "#chmod 640 /etc/audit/auditd.conf",
+    "type": "file_perm",
+    "params": {
+      "path": "/etc/audit/auditd.conf",
+      "max_mode": "0640"
+    },
+    "check": "(st_mode & 0o777) & ~0o640 == 0。",
+    "fix": "記錄原權限後 chmod 為 mode & 0o640；回滾時還原。",
+    "risk": "A",
+    "risk_reason": "僅收緊設定檔權限。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": ""
+  },
+  {
+    "id": "TWGCB-01-014-0124",
+    "category": "日誌與稽核",
+    "title": "稽核工具權限",
+    "expected": "750 或更低權限",
+    "doc_method": "#stat -c \"%a %n\" /sbin/auditctl /sbin/aureport /sbin/ausearch /sbin/autrace /sbin/auditd /sbin/augenrules 2>/dev/null；若權限高於 750 則 #chmod 750 (稽核工具名稱)",
+    "type": "file_perm",
+    "params": {
+      "path": [
+        "/sbin/auditctl",
+        "/sbin/aureport",
+        "/sbin/ausearch",
+        "/sbin/autrace",
+        "/sbin/auditd",
+        "/sbin/augenrules"
+      ],
+      "max_mode": "0750"
+    },
+    "check": "對每個工具 realpath 後 os.stat（不存在者略過），(mode & 0o7777) & ~0o750 == 0 才合格。",
+    "fix": "逐檔記錄原權限後 chmod 為 mode & 0o750；回滾時還原。",
+    "risk": "A",
+    "risk_reason": "工具僅供 root 使用，收緊權限不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "Ubuntu 22.04 為 usrmerge，/sbin 是指向 /usr/sbin 的符號連結，應以 os.path.realpath 解析後檢查實體檔案（/usr/sbin/auditctl 等）；預設權限多為 0755 root:root。檔案不存在者略過（文件指令帶 2>/dev/null）。 套件升級（apt upgrade auditd）會將權限重設為 0755，需重新檢測；可考慮 dpkg-statoverride 但回滾較複雜。"
+  },
+  {
+    "id": "TWGCB-01-014-0125",
+    "category": "日誌與稽核",
+    "title": "稽核工具所有權",
+    "expected": "root:root",
+    "doc_method": "#ls -al /sbin/auditctl /sbin/aureport /sbin/ausearch /sbin/autrace /sbin/auditd /sbin/augenrules 2>/dev/null；若擁有者與群組非 root 則 #chown root:root (稽核工具名稱)",
+    "type": "file_perm",
+    "params": {
+      "path": [
+        "/sbin/auditctl",
+        "/sbin/aureport",
+        "/sbin/ausearch",
+        "/sbin/autrace",
+        "/sbin/auditd",
+        "/sbin/augenrules"
+      ],
+      "owner": "root",
+      "group": "root"
+    },
+    "check": "對每個工具 realpath 後 os.stat（不存在者略過），uid=0 且 gid=0 才合格。",
+    "fix": "逐檔記錄原 uid/gid 後 chown root:root；回滾時還原。",
+    "risk": "A",
+    "risk_reason": "僅變更系統工具擁有者。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "Ubuntu 22.04 為 usrmerge，/sbin 是指向 /usr/sbin 的符號連結，應以 os.path.realpath 解析後檢查實體檔案（/usr/sbin/auditctl 等）；預設權限多為 0755 root:root。檔案不存在者略過（文件指令帶 2>/dev/null）。"
+  },
+  {
+    "id": "TWGCB-01-014-0126",
+    "category": "日誌與稽核",
+    "title": "保護稽核工具",
+    "expected": "啟用",
+    "doc_method": "編輯 /etc/aide.conf，新增或修改為以下內容：#Audit Tools\n/usr/sbin/auditctl p+i+n+u+g+s+b+acl+xattrs+sha512\n/usr/sbin/auditd p+i+n+u+g+s+b+acl+xattrs+sha512\n/usr/sbin/ausearch p+i+n+u+g+s+b+acl+xattrs+sha512\n/usr/sbin/aureport p+i+n+u+g+s+b+acl+xattrs+sha512\n/usr/sbin/autrace p+i+n+u+g+s+b+acl+xattrs+sha512\n/usr/sbin/augenrules p+i+n+u+g+s+b+acl+xattrs+sha512",
+    "type": "custom",
+    "params": {
+      "description": "AIDE 設定需包含指定的稽核工具監控行",
+      "conf_files": [
+        "/etc/aide/aide.conf",
+        "/etc/aide/aide.conf.d/*"
+      ],
+      "lines": [
+        "/usr/sbin/auditctl p+i+n+u+g+s+b+acl+xattrs+sha512",
+        "/usr/sbin/auditd p+i+n+u+g+s+b+acl+xattrs+sha512",
+        "/usr/sbin/ausearch p+i+n+u+g+s+b+acl+xattrs+sha512",
+        "/usr/sbin/aureport p+i+n+u+g+s+b+acl+xattrs+sha512",
+        "/usr/sbin/autrace p+i+n+u+g+s+b+acl+xattrs+sha512",
+        "/usr/sbin/augenrules p+i+n+u+g+s+b+acl+xattrs+sha512"
+      ]
+    },
+    "check": "檢查 aide 套件已安裝；讀取 /etc/aide/aide.conf 及 /etc/aide/aide.conf.d/ 下所有檔案（排除註解），每條 lines 中的路徑都需有對應規則行，且屬性集合包含 p,i,n,u,g,s,b,acl,xattrs,sha512（以 + 分割後做集合比對，不要求順序）。",
+    "fix": "新增 drop-in /etc/aide/aide.conf.d/99_gcb_audit_tools（檔名不可含點，需符合 aide.conf 中 @@x_include 的正規式 ^[a-zA-Z0-9_-]+$），內容為 #Audit Tools 及上述 6 行，權限 0644 root:root；回滾時刪除該檔。之後可選擇執行 aide --config-check -c /etc/aide/aide.conf 驗證語法。不自動重建 AIDE 資料庫。",
+    "risk": "A",
+    "risk_reason": "僅新增 AIDE 監控設定，不影響執行中服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 aide（aide 未安裝時回報不適用或由 AIDE 安裝規則處理）",
+    "notes": "文件路徑 /etc/aide.conf 為 RHEL 慣例，Ubuntu 22.04 的設定檔為 /etc/aide/aide.conf 並支援 /etc/aide/aide.conf.d/ drop-in。文件以 /usr/sbin 路徑列出，與 0124/0125 的 /sbin 寫法不一致（Ubuntu 上兩者相同）。新增設定後需更新 AIDE 資料庫（aideinit），否則下次檢查會報告新增項目；更新資料庫耗時較長，建議僅提示。"
+  },
+  {
+    "id": "TWGCB-01-014-0127",
+    "category": "日誌與稽核",
+    "title": "稽核日誌檔案大小上限",
+    "expected": "32 以上",
+    "doc_method": "編輯 /etc/audit/auditd.conf，設定 max_log_file=32",
+    "type": "auditd_conf",
+    "params": {
+      "key": "max_log_file",
+      "value": 32,
+      "compare": "ge"
+    },
+    "check": "解析 /etc/audit/auditd.conf（key = value，分隔符為 =，前後可有空白，取最後一次出現），max_log_file 為整數且 >= 32 才合格；未設定視為不合格（預設 8）。",
+    "fix": "備份 /etc/audit/auditd.conf，將 max_log_file 行改為 max_log_file = 32（不存在則附加）；以 service auditd reload 或 pkill -HUP auditd 讓設定生效。回滾時還原備份並重新載入。",
+    "risk": "A",
+    "risk_reason": "調整日誌大小參數不影響服務運作。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "auditd.conf 不支援 drop-in，只能就地修改並備份。Ubuntu 預設 max_log_file = 8。auditd.service 有 RefuseManualStop=yes，不可用 systemctl restart auditd，應用 service auditd restart/reload。文件文字「設為 32」與設定值「32 以上」略不一致，以 >=32 判定。"
+  },
+  {
+    "id": "TWGCB-01-014-0128",
+    "category": "日誌與稽核",
+    "title": "稽核日誌達到其檔案大小上限之行為",
+    "expected": "keep_logs",
+    "doc_method": "編輯 /etc/audit/auditd.conf，設定 max_log_file_action=keep_logs",
+    "type": "auditd_conf",
+    "params": {
+      "key": "max_log_file_action",
+      "value": "keep_logs",
+      "compare": "eq"
+    },
+    "check": "解析 /etc/audit/auditd.conf，max_log_file_action 不分大小寫等於 keep_logs 才合格。",
+    "fix": "備份 /etc/audit/auditd.conf，將 max_log_file_action 改為 keep_logs（不存在則附加）；service auditd reload 或 pkill -HUP auditd。回滾時還原備份並重新載入。",
+    "risk": "A",
+    "risk_reason": "僅改變日誌輪替行為，不會讓系統停擺。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "Ubuntu 預設為 ROTATE。keep_logs 不刪除舊日誌，長期可能占滿 /var/log 分割區，進而觸發 space_left/disk_full 動作（若其他規則設為 halt/single 則有停擺風險），報告中應提醒定期備份與清理。"
+  },
+  {
+    "id": "TWGCB-01-014-0129",
+    "category": "日誌與稽核",
+    "title": "記錄系統管理者活動",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯 audit.rules（#vim /etc/audit/rules.d/audit.rules），加入：\n-w /etc/sudoers -p wa -k scope\n-w /etc/sudoers.d/ -p wa -k scope；#augenrules --load 載入；#auditctl -s | grep enabled 若輸出 enabled 2 表示稽核組態已鎖定，需重新開機才能載入",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /etc/sudoers -p wa -k scope",
+        "-w /etc/sudoers.d/ -p wa -k scope"
+      ],
+      "file": "/etc/audit/rules.d/gcb-0129-scope.rules"
+    },
+    "check": "1) 讀取 /etc/audit/rules.d/*.rules（排除註解、合併空白），每條規則行都需存在（開機後生效）；2) 執行 auditctl -l，每條規則都需出現在目前生效規則中（比對時需正規化：auditctl -l 會把 -k X 顯示為 -F key=X、目錄 watch 可能去掉結尾斜線、syscall 順序可能不同，應以集合比對 syscall）。兩者皆符合才算合格；僅檔案有而未生效時回報「待載入」。",
+    "fix": "將規則寫入獨立檔案 /etc/audit/rules.d/gcb-0129-scope.rules（新檔，回滾時刪除即可；若檔案已存在則先備份），權限 root:root 0600；執行 augenrules --load 載入；再以 auditctl -s 檢查，若輸出 enabled 2 表示稽核組態已鎖定（-e 2），規則需重開機才生效，應回報需重開機而非失敗。備份：既有同名 rules 檔與 /etc/audit/audit.rules（augenrules 會重新產生）。",
+    "risk": "A",
+    "risk_reason": "新增稽核規則僅增加記錄量，不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "auditctl -l 對目錄 watch 可能顯示為 -w /etc/sudoers.d -p wa -k scope（無結尾斜線），比對需正規化。文件建議寫入 audit.rules，本工具改寫入獨立檔案。 若目前規則已設為不可變更（auditctl -s 顯示 enabled 2），需重開機才會生效。"
+  },
+  {
+    "id": "TWGCB-01-014-0130",
+    "category": "日誌與稽核",
+    "title": "記錄變更登入與登出資訊事件",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯 audit.rules（#vim /etc/audit/rules.d/audit.rules），加入：\n-w /var/run/faillock/ -p wa -k logins\n-w /var/log/lastlog -p wa -k logins；#augenrules --load 載入；#auditctl -s | grep enabled 若輸出 enabled 2 表示稽核組態已鎖定，需重新開機才能載入",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /var/run/faillock/ -p wa -k logins",
+        "-w /var/log/lastlog -p wa -k logins"
+      ],
+      "file": "/etc/audit/rules.d/gcb-0130-logins.rules"
+    },
+    "check": "1) 讀取 /etc/audit/rules.d/*.rules（排除註解、合併空白），每條規則行都需存在（開機後生效）；2) 執行 auditctl -l，每條規則都需出現在目前生效規則中（比對時需正規化：auditctl -l 會把 -k X 顯示為 -F key=X、目錄 watch 可能去掉結尾斜線、syscall 順序可能不同，應以集合比對 syscall）。兩者皆符合才算合格；僅檔案有而未生效時回報「待載入」。",
+    "fix": "將規則寫入獨立檔案 /etc/audit/rules.d/gcb-0130-logins.rules（新檔，回滾時刪除即可；若檔案已存在則先備份），權限 root:root 0600；執行 augenrules --load 載入；再以 auditctl -s 檢查，若輸出 enabled 2 表示稽核組態已鎖定（-e 2），規則需重開機才生效，應回報需重開機而非失敗。備份：既有同名 rules 檔與 /etc/audit/audit.rules（augenrules 會重新產生）。",
+    "risk": "A",
+    "risk_reason": "新增稽核規則僅增加記錄量，不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "Ubuntu 22.04 的 /var/run 是指向 /run 的符號連結；/var/run/faillock/ 只有在 PAM 使用 pam_faillock 時才會存在（Ubuntu 預設未啟用），目錄不存在時 auditctl 仍可新增 watch（父目錄存在即可），但 auditctl -l 顯示路徑可能為 /var/run/faillock（無斜線），比對需正規化。 若目前規則已設為不可變更（auditctl -s 顯示 enabled 2），需重開機才會生效。"
+  },
+  {
+    "id": "TWGCB-01-014-0131",
+    "category": "日誌與稽核",
+    "title": "記錄會談啟始資訊",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯 audit.rules（#vim /etc/audit/rules.d/audit.rules），加入：\n-w /var/run/utmp -p wa -k session\n-w /var/log/wtmp -p wa -k session\n-w /var/log/btmp -p wa -k session；#augenrules --load 載入；#auditctl -s | grep enabled 若輸出 enabled 2 表示稽核組態已鎖定，需重新開機才能載入",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-w /var/run/utmp -p wa -k session",
+        "-w /var/log/wtmp -p wa -k session",
+        "-w /var/log/btmp -p wa -k session"
+      ],
+      "file": "/etc/audit/rules.d/gcb-0131-session.rules"
+    },
+    "check": "1) 讀取 /etc/audit/rules.d/*.rules（排除註解、合併空白），每條規則行都需存在（開機後生效）；2) 執行 auditctl -l，每條規則都需出現在目前生效規則中（比對時需正規化：auditctl -l 會把 -k X 顯示為 -F key=X、目錄 watch 可能去掉結尾斜線、syscall 順序可能不同，應以集合比對 syscall）。兩者皆符合才算合格；僅檔案有而未生效時回報「待載入」。",
+    "fix": "將規則寫入獨立檔案 /etc/audit/rules.d/gcb-0131-session.rules（新檔，回滾時刪除即可；若檔案已存在則先備份），權限 root:root 0600；執行 augenrules --load 載入；再以 auditctl -s 檢查，若輸出 enabled 2 表示稽核組態已鎖定（-e 2），規則需重開機才生效，應回報需重開機而非失敗。備份：既有同名 rules 檔與 /etc/audit/audit.rules（augenrules 會重新產生）。",
+    "risk": "A",
+    "risk_reason": "新增稽核規則僅增加記錄量，不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "Ubuntu 22.04 的 /var/run 是指向 /run 的符號連結，/var/run/utmp 實際為 /run/utmp；保留文件原寫法即可。 若目前規則已設為不可變更（auditctl -s 顯示 enabled 2），需重開機才會生效。"
+  },
+  {
+    "id": "TWGCB-01-014-0132",
+    "category": "日誌與稽核",
+    "title": "記錄變更日期與時間事件",
+    "expected": "啟用",
+    "doc_method": "在 /etc/audit/rules.d/ 新增或編輯 audit.rules（#vim /etc/audit/rules.d/audit.rules），加入：\n-a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time-change\n-a always,exit -F arch=b32 -S adjtimex,settimeofday,clock_settime -k time-change\n-w /etc/localtime -p wa -k time-change；#augenrules --load 載入；#auditctl -s | grep enabled 若輸出 enabled 2 表示稽核組態已鎖定，需重新開機才能載入",
+    "type": "audit_rule",
+    "params": {
+      "rules": [
+        "-a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time-change",
+        "-a always,exit -F arch=b32 -S adjtimex,settimeofday,clock_settime -k time-change",
+        "-w /etc/localtime -p wa -k time-change"
+      ],
+      "file": "/etc/audit/rules.d/gcb-0132-time-change.rules"
+    },
+    "check": "1) 讀取 /etc/audit/rules.d/*.rules（排除註解、合併空白），每條規則行都需存在（開機後生效）；2) 執行 auditctl -l，每條規則都需出現在目前生效規則中（比對時需正規化：auditctl -l 會把 -k X 顯示為 -F key=X、目錄 watch 可能去掉結尾斜線、syscall 順序可能不同，應以集合比對 syscall）。兩者皆符合才算合格；僅檔案有而未生效時回報「待載入」。",
+    "fix": "將規則寫入獨立檔案 /etc/audit/rules.d/gcb-0132-time-change.rules（新檔，回滾時刪除即可；若檔案已存在則先備份），權限 root:root 0600；執行 augenrules --load 載入；再以 auditctl -s 檢查，若輸出 enabled 2 表示稽核組態已鎖定（-e 2），規則需重開機才生效，應回報需重開機而非失敗。備份：既有同名 rules 檔與 /etc/audit/audit.rules（augenrules 會重新產生）。",
+    "risk": "A",
+    "risk_reason": "新增稽核規則僅增加記錄量，不影響服務。",
+    "needs_reboot": false,
+    "applies_when": "已安裝 auditd",
+    "notes": "文件說明列出 stime 系統呼叫，但規則行未包含 stime（b64 架構本無 stime；CIS 慣例會在 b32 規則加 -S stime），本規格依原文不加。說明中的 /var/log/audit.log 應為 /var/log/audit/audit.log。PDF 斷行造成 clock_settim e、time- change，已還原為 clock_settime、time-change。auditctl -l 會顯示為 -F key=time-change，需正規化比對；b32 規則在 64 位元核心需支援 IA32 模擬才能載入（Ubuntu 預設支援）。 若目前規則已設為不可變更（auditctl -s 顯示 enabled 2），需重開機才會生效。"
+  }
+]
