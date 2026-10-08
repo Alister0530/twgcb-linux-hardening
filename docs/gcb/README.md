@@ -21,6 +21,6 @@ pip3 install pypdf
 python3 tools/gcb_pdf_split.py "docs/gcb/rhel8/<PDF 檔名>" docs/gcb/rhel8/chunks.json
 ```
 
-有 `chunks.json` 時，`tests/test_platforms.py` 會比對程式中的規則編號與名稱是否和原文一致；沒有時會自動略過這項測試。
+有 `chunks.json` 時，`tests/test_platforms.py` 會比對程式中的規則編號與名稱是否和原文一致；沒有時該平台的比對會標示為略過，測試結果顯示為 `OK (skipped=N)`，並註明缺少哪個平台的 `chunks.json`。
 
 PDF 與 `chunks.json` 已列在 `.gitignore`，不會被提交。

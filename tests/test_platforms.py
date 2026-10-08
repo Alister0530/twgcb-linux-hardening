@@ -50,16 +50,18 @@ class DocumentMatchTest(unittest.TestCase):
         import re
         base = os.path.join(os.path.dirname(__file__), "..", "docs", "gcb")
         for p in platforms.PLATFORMS:
-            path = os.path.join(base, p.key, "chunks.json")
-            if not os.path.exists(path):
-                continue
-            doc = dict((v["id"], re.sub(r"\s", "", v["text"])) for v in json.load(open(path)).values())
-            osi = osinfo.OSInfo(p.key, p.family, p.key, p.os_ids[0], p.version)
-            code = dict(rules_for(osi))
-            self.assertEqual(sorted(doc), sorted(code), "%s 規則編號與文件不一致" % p.key)
-            for rid, r in code.items():
-                self.assertTrue(_title_in_doc(r.title_for(osi), doc[rid]),
-                                "%s 項目名稱「%s」與原文不符" % (rid, r.title_for(osi)))
+            with self.subTest(platform=p.key):
+                path = os.path.join(base, p.key, "chunks.json")
+                if not os.path.exists(path):
+                    # 明確標示略過，避免誤以為已比對（下載方式見 docs/gcb/README.md）
+                    self.skipTest("%s 缺少 docs/gcb/%s/chunks.json，略過與 GCB 原文的比對" % (p.key, p.key))
+                doc = dict((v["id"], re.sub(r"\s", "", v["text"])) for v in json.load(open(path)).values())
+                osi = osinfo.OSInfo(p.key, p.family, p.key, p.os_ids[0], p.version)
+                code = dict(rules_for(osi))
+                self.assertEqual(sorted(doc), sorted(code), "%s 規則編號與文件不一致" % p.key)
+                for rid, r in code.items():
+                    self.assertTrue(_title_in_doc(r.title_for(osi), doc[rid]),
+                                    "%s 項目名稱「%s」與原文不符" % (rid, r.title_for(osi)))
 
 
 def _title_in_doc(title, text):
