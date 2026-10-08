@@ -5,6 +5,7 @@
 即使程式中途中斷也能依紀錄還原。回滾時依相反順序執行。
 """
 import json
+import re
 import os
 import shutil
 import tarfile
@@ -203,13 +204,44 @@ def later_conflicts(journal, rule_id):
     return out
 
 
+def is_audit_reload(entry):
+    """回滾指令是否為重新載入稽核規則（augenrules --load、service auditd reload）。"""
+    if entry["type"] != "cmd":
+        return False
+    c = entry["data"]["cmd"]
+    c = " ".join(c) if isinstance(c, list) else c
+    return "augenrules --load" in c or ("auditd" in c and "reload" in c)
+
+
+def audit_locked():
+    """稽核規則是否已設為不可變更（-e 2）：此時核心拒絕任何變更，直到重開機。"""
+    r = run(["auditctl", "-s"], timeout=15)
+    return r.ok and bool(re.search(r"^enabled\s+2\b", r.out, re.M))
+
+
 def rollback(journal, osi, say, rule_id=None):
-    """依相反順序回滾；rule_id 指定時只回滾該規則。回傳 (成功數, 失敗數)。"""
+    """依相反順序回滾；rule_id 指定時只回滾該規則。回傳 (成功數, 失敗數)。
+
+    稽核規則已鎖定（-e 2）時，重新載入稽核規則必定失敗；設定檔已由其他紀錄還原，
+    此類步驟記為「需重開機生效」而非失敗，並設定 journal.reboot_audit。
+    """
     ok = fail = 0
+    locked = None
+    journal.reboot_audit = False
     for e in reversed(journal.entries):
         if e["rolled_back"] or (rule_id and e["rule"] != rule_id):
             continue
         rid = e["rule"]
+        if is_audit_reload(e):
+            if locked is None:
+                locked = audit_locked()
+            if locked:
+                say(rid, "略過重新載入稽核規則", "稽核規則已鎖定（-e 2），設定檔已還原，重開機後生效", "需重開機")
+                journal.reboot_audit = True
+                e["rolled_back"] = True
+                ok += 1
+                journal.save()
+                continue
         try:
             with activity("回滾 %s（%s #%s）" % (rid, e["type"], e["seq"])):
                 good = _undo(e, osi, lambda a, m, ok=True: say(rid, a, m, "成功" if ok else "失敗"))

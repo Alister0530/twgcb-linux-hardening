@@ -175,20 +175,34 @@ def choose_services(ctx, preset=None):
     return [s.strip() for s in ans.split(",") if s.strip()]
 
 
+def _rhel_repo_problem():
+    """回傳 (問題說明或空字串, 指令結果)。未註冊的 RHEL 執行 makecache 也可能成功，需先確認有已啟用的套件庫。"""
+    r = run(["dnf", "-q", "repolist", "--enabled"], timeout=120)
+    text = r.text().lower()
+    if "not registered" in text or "consumer identity" in text:
+        return "RHEL 尚未註冊訂閱（請執行 subscription-manager register），沒有可用的官方套件庫", r
+    repos = [l for l in r.out.splitlines() if l.strip() and not l.lower().startswith("repo id")]
+    if not r.ok or not repos:
+        return "沒有任何已啟用的套件庫（RHEL 請註冊訂閱，或設定內部鏡像站）", r
+    r = run(["dnf", "-q", "makecache"], timeout=120)
+    return ("" if r.ok else "套件庫無法連線"), r
+
+
 def check_repo(ctx):
     ctx.say("\n【3/4】檢查套件庫連線（最多等 2 分鐘）")
     if ctx.osi.family == "rhel":
-        r = run(["dnf", "-q", "makecache"], timeout=120)
+        why, r = _rhel_repo_problem()
     else:
         r = run(["apt-get", "-q", "update"], timeout=120, env={"DEBIAN_FRONTEND": "noninteractive"})
-        if r.ok and re.search(r"^(W|E): ", r.out + r.err, re.M):
-            r.rc = 1
-    if r.ok:
+        why = "" if r.ok and not re.search(r"^(W|E): ", r.out + r.err, re.M) else "套件庫無法連線"
+    if not why:
         ctx.say("  ✓ 可以連線套件庫")
     else:
-        ctx.say("  ! 無法連線套件庫：需要安裝套件的項目（如 auditd、rsyslog）會標示為需人工處理，其他項目不受影響")
-    ctx.log_event("setup", "檢查套件庫", r.text()[-300:], "成功" if r.ok else "失敗")
-    return r.ok
+        ctx.say("  ! 無法使用套件庫：%s" % why)
+        ctx.say("    需要安裝套件的項目（如 aide、auditd、rsyslog）會標示為需人工處理，其他項目不受影響；"
+                "建議先排除後再開始修復")
+    ctx.log_event("setup", "檢查套件庫", (why + "；" if why else "") + r.text()[-300:], "失敗" if why else "成功")
+    return not why
 
 
 def write_config(ctx, path, values):

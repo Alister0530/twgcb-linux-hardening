@@ -253,6 +253,17 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(self.outcome(ctx2, 1), "已修復 → 已回滾")
         self.assertEqual(engine.cmd_rollback(ctx2, "TWGCB-01-014-0099"), 1)  # 沒有紀錄的規則
 
+    def test_rollback_single_rule_audit_locked_note(self):
+        ctx, rc = self.run_engine(make_args(include_risky=True))
+        ctx2 = engine.load_context(self.cfg, self.osi, ctx.run_id, make_args())
+
+        def rb(j, osi, say, rule_id=None):
+            j.reboot_audit = True
+            return 1, 0
+        with mock.patch.object(engine.journal, "rollback", rb):
+            engine.cmd_rollback(ctx2, "TWGCB-01-014-0001")
+        self.assertIn("需重開機後稽核規則才會恢復", sys.stdout.getvalue())
+
     def test_rollback_all_twice_no_duplicate_mark(self):
         ctx, rc = self.run_engine(make_args())
         ctx2 = engine.load_context(self.cfg, self.osi, ctx.run_id, make_args())
@@ -369,6 +380,59 @@ class ProgressTest(unittest.TestCase):
         with mock.patch("sys.stdout", out):
             util._progress("修復 TWGCB-01-014-0033 AIDE 套件", 754)
         self.assertEqual(out.getvalue(), "      … 仍在執行：修復 TWGCB-01-014-0033 AIDE 套件（已 12 分 34 秒）\n")
+
+
+class AuditLockedRollbackTest(unittest.TestCase):
+    """稽核規則已鎖定（-e 2）時，重新載入稽核規則的回滾步驟記為「需重開機」而非失敗。"""
+    def setUp(self):
+        from gcb import journal
+        self.j = journal
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.jr = journal.Journal(self.tmp)
+        self.jr.add("R0148", "cmd", cmd=["augenrules", "--load"], desc="重新載入稽核規則")
+        self.jr.add("R0149", "cmd", cmd="service auditd reload", desc="重新載入")
+        self.jr.add("R0150", "cmd", cmd=["true"], desc="其他還原")
+        self.said = []
+
+    def say(self, rid, action, msg, result):
+        self.said.append((rid, action, result))
+
+    def test_detect(self):
+        e = self.jr.entries
+        self.assertEqual([self.j.is_audit_reload(x) for x in e], [True, True, False])
+        self.assertFalse(self.j.is_audit_reload({"type": "file", "data": {}}))
+        with mock.patch.object(self.j, "run", return_value=mock.Mock(ok=True, out="enabled 2\nfailure 1\n")):
+            self.assertTrue(self.j.audit_locked())
+        with mock.patch.object(self.j, "run", return_value=mock.Mock(ok=True, out="enabled 1\n")):
+            self.assertFalse(self.j.audit_locked())
+
+    def test_locked_counts_as_reboot_needed(self):
+        calls = []
+
+        def fake_run(cmd, **kw):
+            calls.append(cmd)
+            return mock.Mock(ok=True, out="enabled 2\n", rc=0, cmd=str(cmd), text=lambda: "")
+        with mock.patch.object(self.j, "run", fake_run):
+            ok, fail = self.j.rollback(self.jr, None, self.say)
+        self.assertEqual((ok, fail), (3, 0))
+        self.assertTrue(self.jr.reboot_audit)
+        self.assertEqual(calls.count(["auditctl", "-s"]), 1)      # 只查一次鎖定狀態
+        self.assertNotIn(["augenrules", "--load"], calls)          # 不執行必定失敗的重新載入
+        self.assertIn(("R0148", "略過重新載入稽核規則", "需重開機"), self.said)
+
+    def test_not_locked_runs_reload(self):
+        def fake_run(cmd, **kw):
+            return mock.Mock(ok=cmd != ["augenrules", "--load"], out="enabled 1\n", rc=0, cmd=str(cmd), text=lambda: "x")
+        with mock.patch.object(self.j, "run", fake_run):
+            ok, fail = self.j.rollback(self.jr, None, self.say)
+        self.assertEqual((ok, fail), (2, 1))
+        self.assertFalse(self.jr.reboot_audit)
+
+    def test_summary_mentions_reboot(self):
+        said = []
+        engine._say_rollback_result(mock.Mock(say=said.append), 220, 0, [], True)
+        self.assertIn("稽核規則已鎖定（-e 2）：設定檔已還原，需重開機後稽核規則才會恢復（sudo reboot）", "\n".join(said))
 
 
 if __name__ == "__main__":

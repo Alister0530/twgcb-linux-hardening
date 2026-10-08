@@ -240,7 +240,8 @@ def rollback_all(ctx, reason):
     for f in ctx.state.get("fixes", []):
         if f["outcome"].startswith(("已修復", "部分修復")) and "回滾" not in f["outcome"]:
             f["outcome"] += mark
-    ctx.state["rollback"] = {"time": now(), "reason": reason, "ok": ok, "fail": fail}
+    ctx.state["rollback"] = {"time": now(), "reason": reason, "ok": ok, "fail": fail,
+                             "reboot_audit": getattr(ctx.journal, "reboot_audit", False)}
     ctx.save()
     return fail == 0
 
@@ -399,16 +400,18 @@ def _say_rolled_back(ctx, rb, rb_health, s0, s1):
     """整次回滾後的結論：明確說明已回滾、原因、回滾結果與登入狀態。"""
     ctx.say("\n================ 完成：本次修改已全部回滾 ================")
     ctx.say("回滾原因：%s" % rb["reason"])
-    _say_rollback_result(ctx, rb["ok"], rb["fail"], rb_health)
+    _say_rollback_result(ctx, rb["ok"], rb["fail"], rb_health, rb.get("reboot_audit"))
     ctx.say("合規率：修復前 %s；修復後曾達 %s，已回滾不保留" % (s0["rate"], s1["rate"]))
 
 
-def _say_rollback_result(ctx, ok, fail, rb_health):
+def _say_rollback_result(ctx, ok, fail, rb_health, reboot_audit=False):
     if fail:
         ctx.say("回滾結果：! 成功 %d 項、失敗 %d 項，系統未完全回到修復前狀態" % (ok, fail))
         ctx.say("          請查看 log 中「回滾未完全成功」的項目人工處理，或還原 VM 快照")
     else:
         ctx.say("回滾結果：成功 %d 項、失敗 0 項，系統已回到修復前狀態" % ok)
+    if reboot_audit:
+        ctx.say("          稽核規則已鎖定（-e 2）：設定檔已還原，需重開機後稽核規則才會恢復（sudo reboot）")
     bad = [i for i in rb_health if i["id"] in LOGIN_CHECKS + ("H19",) and i["status"] not in (health.OK, health.SKIP)]
     if bad:
         ctx.say("回滾後登入：! 未通過：%s，請保留目前連線並立即確認可登入" % "、".join(
@@ -469,6 +472,8 @@ def cmd_rollback(ctx, rule_id=None):
                 f["outcome"] += " → 已回滾" if fail == 0 else " → 回滾未完全成功"
         ctx.state.setdefault("manual_rollbacks", []).append({"time": now(), "rule": rule_id, "ok": ok, "fail": fail})
         ctx.say("  成功 %d 項，失敗 %d 項" % (ok, fail))
+        if getattr(ctx.journal, "reboot_audit", False):
+            ctx.say("  稽核規則已鎖定（-e 2）：設定檔已還原，需重開機後稽核規則才會恢復（sudo reboot）")
     else:
         rollback_all(ctx, "手動執行回滾")
     ctx.state["rollback_health"] = do_health(ctx, "回滾後健康檢查")
@@ -477,6 +482,6 @@ def cmd_rollback(ctx, rule_id=None):
     if not rule_id:
         rb = ctx.state["rollback"]
         ctx.say("\n================ 回滾完成 ================")
-        _say_rollback_result(ctx, rb["ok"], rb["fail"], ctx.state["rollback_health"])
+        _say_rollback_result(ctx, rb["ok"], rb["fail"], ctx.state["rollback_health"], rb.get("reboot_audit"))
     ctx.say("\n已更新修復情況報告：%s" % path)
     return 0

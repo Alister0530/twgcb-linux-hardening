@@ -226,9 +226,28 @@ class TestServicesRepoConfig(Base):
         self.assertIn("沒有偵測到", ctx.out[-1])
 
     def test_check_repo(self):
+        self.runner.add("repolist", res(0, "repo id   repo name\nbaseos    BaseOS\n"))
         ctx = Ctx("rhel9")
         self.assertTrue(s.check_repo(ctx))
-        self.assertEqual(self.runner.calls[-1], "dnf -q makecache")
+        self.assertEqual(self.runner.calls[-2:], ["dnf -q repolist --enabled", "dnf -q makecache"])
+
+    def test_check_repo_rhel_problems(self):
+        # 未註冊的 RHEL：makecache 可能成功，但沒有任何套件庫 → 設定精靈就要提醒
+        cases = [
+            (res(0, "", "This system is not registered with an entitlement server."), "RHEL 尚未註冊訂閱"),
+            (res(0, ""), "沒有任何已啟用的套件庫"),
+        ]
+        for result, want in cases:
+            self.runner.add("repolist", result)
+            ctx = Ctx("rhel8")
+            self.assertFalse(s.check_repo(ctx))
+            self.assertTrue(any(want in line for line in ctx.out), ctx.out)
+            self.assertNotIn("dnf -q makecache", self.runner.calls)
+        self.runner.add("repolist", res(0, "appstream AppStream\n"))
+        self.runner.add("makecache", res(1, "", "Curl error"))
+        ctx = Ctx("rhel8")
+        self.assertFalse(s.check_repo(ctx))
+        self.assertTrue(any("套件庫無法連線" in line for line in ctx.out))
         self.runner.add("apt-get", res(0, "W: Failed to fetch http://x\n"))
         ctx = Ctx("ubuntu2204")
         self.assertFalse(s.check_repo(ctx))
